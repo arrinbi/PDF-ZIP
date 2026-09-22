@@ -1,7 +1,7 @@
 import type { OptimizationOptions } from '../types';
 
-export const DEFAULT_MAX_DIMENSION = 4096; // Avoid aggressive downscaling while preventing upscaling
-export const DEFAULT_QUALITY = 0.93; // High quality JPEG compression (0.92–0.95) for sharp text and fine details
+export const DEFAULT_MAX_DIMENSION = 8192; // Avoid unnecessary downscaling while preventing canvas overflow and upscaling
+export const DEFAULT_QUALITY = 0.98; // Very high quality JPEG compression for maximum visual clarity, sharp text, and fine line art
 
 /**
  * Calculates new width and height respecting max dimension and maintaining aspect ratio.
