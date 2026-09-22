@@ -1,5 +1,6 @@
 import jsPDF from 'jspdf';
 import type { GeneratedPdfResult, ImageItem, PdfOptions } from '../types';
+import { processImageForPdf, DEFAULT_QUALITY } from './imageOptimizer';
 
 /**
  * Detects the image format required by jsPDF based on MIME type or Data URL header.
@@ -21,7 +22,7 @@ export function getImageFormat(type?: string, dataUrl?: string): string {
 
 /**
  * Generates a single PDF document containing all provided images.
- * Automatically fits images to PDF pages while preserving original aspect ratios and quality.
+ * Automatically fits images to PDF pages while preserving original aspect ratios and applying format/quality settings.
  */
 export async function generatePdfFromImages(
   images: ImageItem[],
@@ -36,14 +37,19 @@ export async function generatePdfFromImages(
   const totalImages = images.length;
 
   const baseWidthMm = 210; // Standard reference width in mm
+  const targetFormat = options.outputFormat || 'JPG';
+  const targetQuality = options.quality !== undefined ? options.quality : DEFAULT_QUALITY;
 
   for (let i = 0; i < totalImages; i++) {
     const item = images[i];
-    const imageDataUrl = item.previewUrl || item.optimizedDataUrl || '';
-    const imgWidthPx = item.width || item.optimizedWidth || 1;
-    const imgHeightPx = item.height || item.optimizedHeight || 1;
 
-    const format = getImageFormat(item.type, imageDataUrl);
+    // Process image according to format and quality settings
+    const processed = await processImageForPdf(item, targetFormat, targetQuality);
+
+    const imageDataUrl = processed.dataUrl;
+    const imgWidthPx = processed.width || item.width || 1;
+    const imgHeightPx = processed.height || item.height || 1;
+    const format = processed.jsPdfFormat || getImageFormat(item.type, imageDataUrl);
 
     const margin = options.margin || 0;
     const availWidth = baseWidthMm - margin * 2;
