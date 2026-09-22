@@ -67,18 +67,45 @@ describe('pdfGenerator utilities', () => {
     expect(progressSpy).toHaveBeenLastCalledWith(2, 2);
   });
 
-  it('accepts outputFormat and quality options', async () => {
-    const options: PdfOptions = {
+  it('accepts outputFormat and quality options (80%, 85%, 90%, 95%, 100%)', { timeout: 15000 }, async () => {
+    const qualityLevels = [0.80, 0.85, 0.90, 0.95, 1.00];
+
+    for (const q of qualityLevels) {
+      const optionsJpg: PdfOptions = {
+        pageSize: 'fit',
+        margin: 0,
+        filename: `doc_jpg_${q}`,
+        outputFormat: 'JPG',
+        quality: q,
+      };
+      const resultJpg = await generatePdfFromImages(sampleImages, optionsJpg);
+      expect(resultJpg).toBeDefined();
+      expect(resultJpg.pageCount).toBe(2);
+
+      const optionsWebp: PdfOptions = {
+        pageSize: 'fit',
+        margin: 0,
+        filename: `doc_webp_${q}`,
+        outputFormat: 'WEBP',
+        quality: q,
+      };
+      const resultWebp = await generatePdfFromImages(sampleImages, optionsWebp);
+      expect(resultWebp).toBeDefined();
+      expect(resultWebp.pageCount).toBe(2);
+    }
+  });
+
+  it('generates PNG output retaining PNG format losslessly', async () => {
+    const optionsPng: PdfOptions = {
       pageSize: 'fit',
       margin: 0,
-      filename: 'my_doc',
-      outputFormat: 'JPG',
-      quality: 0.75,
+      filename: 'doc_png',
+      outputFormat: 'PNG',
     };
-
-    const result = await generatePdfFromImages(sampleImages, options);
-    expect(result).toBeDefined();
-    expect(result.pageCount).toBe(2);
+    const resultPng = await generatePdfFromImages(sampleImages, optionsPng);
+    expect(resultPng).toBeDefined();
+    expect(resultPng.pageCount).toBe(2);
+    expect(resultPng.sizeBytes).toBeGreaterThan(0);
   });
 
   it('preserves original file names on ImageItem objects', () => {
