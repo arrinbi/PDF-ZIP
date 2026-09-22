@@ -2,8 +2,26 @@ import jsPDF from 'jspdf';
 import type { GeneratedPdfResult, ImageItem, PdfOptions } from '../types';
 
 /**
+ * Detects the image format required by jsPDF based on MIME type or Data URL header.
+ */
+export function getImageFormat(type?: string, dataUrl?: string): string {
+  if (type) {
+    const lowerType = type.toLowerCase();
+    if (lowerType.includes('png')) return 'PNG';
+    if (lowerType.includes('webp')) return 'WEBP';
+    if (lowerType.includes('jpeg') || lowerType.includes('jpg')) return 'JPEG';
+  }
+  if (dataUrl) {
+    if (dataUrl.startsWith('data:image/png')) return 'PNG';
+    if (dataUrl.startsWith('data:image/webp')) return 'WEBP';
+    if (dataUrl.startsWith('data:image/jpeg') || dataUrl.startsWith('data:image/jpg')) return 'JPEG';
+  }
+  return 'JPEG';
+}
+
+/**
  * Generates a single PDF document containing all provided images.
- * Automatically fits images to PDF pages while preserving original aspect ratios.
+ * Automatically fits images to PDF pages while preserving original aspect ratios and quality.
  */
 export async function generatePdfFromImages(
   images: ImageItem[],
@@ -21,9 +39,11 @@ export async function generatePdfFromImages(
 
   for (let i = 0; i < totalImages; i++) {
     const item = images[i];
-    const imageDataUrl = item.optimizedDataUrl || item.previewUrl;
-    const imgWidthPx = item.optimizedWidth || item.width;
-    const imgHeightPx = item.optimizedHeight || item.height;
+    const imageDataUrl = item.previewUrl || item.optimizedDataUrl || '';
+    const imgWidthPx = item.width || item.optimizedWidth || 1;
+    const imgHeightPx = item.height || item.optimizedHeight || 1;
+
+    const format = getImageFormat(item.type, imageDataUrl);
 
     const margin = options.margin || 0;
     const availWidth = baseWidthMm - margin * 2;
@@ -51,7 +71,7 @@ export async function generatePdfFromImages(
     if (pdf) {
       const x = margin;
       const y = margin;
-      pdf.addImage(imageDataUrl, 'JPEG', x, y, drawW, drawH, undefined, 'NONE');
+      pdf.addImage(imageDataUrl, format, x, y, drawW, drawH, undefined, 'NONE');
     }
 
     if (onProgress) {
@@ -72,7 +92,7 @@ export async function generatePdfFromImages(
     ? options.filename.endsWith('.pdf')
       ? options.filename
       : `${options.filename}.pdf`
-    : 'optimized_images.pdf';
+    : 'converted_images.pdf';
 
   return {
     blob,

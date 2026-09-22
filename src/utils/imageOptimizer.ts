@@ -1,7 +1,7 @@
 import type { OptimizationOptions } from '../types';
 
-export const DEFAULT_MAX_DIMENSION = 8192; // Avoid unnecessary downscaling while preventing canvas overflow and upscaling
-export const DEFAULT_QUALITY = 0.85; // Balanced JPEG compression (85%) for clear line art and text readability while optimizing PDF file size
+export const DEFAULT_MAX_DIMENSION = 8192; // Max dimension reference
+export const DEFAULT_QUALITY = 1.0; // Preserve 100% original quality
 
 /**
  * Calculates new width and height respecting max dimension and maintaining aspect ratio.
@@ -64,63 +64,21 @@ export function readImageData(file: File): Promise<{ previewUrl: string; width: 
 }
 
 /**
- * Optimizes an image using HTML Canvas with balanced compression.
- * White background added for transparent PNG/WEBP conversion to JPEG.
+ * Returns original image data directly without canvas re-encoding or compression.
  */
 export async function optimizeSingleImage(
   dataUrl: string,
   origWidth: number,
   origHeight: number,
-  options: OptimizationOptions = {}
+  _options: OptimizationOptions = {}
 ): Promise<{ dataUrl: string; width: number; height: number; sizeBytes: number }> {
-  const maxDim = options.maxDimension ?? DEFAULT_MAX_DIMENSION;
-  const quality = options.quality ?? DEFAULT_QUALITY;
+  const base64Str = dataUrl.split(',')[1] || '';
+  const sizeBytes = Math.round((base64Str.length * 3) / 4);
 
-  const { width: targetWidth, height: targetHeight } = calculateTargetDimensions(origWidth, origHeight, maxDim);
-
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.onload = () => {
-      try {
-        const canvas = document.createElement('canvas');
-        canvas.width = targetWidth;
-        canvas.height = targetHeight;
-
-        const ctx = canvas.getContext('2d');
-        if (!ctx) {
-          reject(new Error('Could not get 2D context from canvas'));
-          return;
-        }
-
-        // Fill background with white (handles transparent PNG/WEBP cleanly)
-        ctx.fillStyle = '#FFFFFF';
-        ctx.fillRect(0, 0, targetWidth, targetHeight);
-
-        // High quality image smoothing
-        ctx.imageSmoothingEnabled = true;
-        ctx.imageSmoothingQuality = 'high';
-
-        // Draw scaled image
-        ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
-
-        // Compress to JPEG format
-        const optimizedDataUrl = canvas.toDataURL('image/jpeg', quality);
-
-        // Calculate size in bytes from base64 string
-        const base64Str = optimizedDataUrl.split(',')[1] || '';
-        const sizeBytes = Math.round((base64Str.length * 3) / 4);
-
-        resolve({
-          dataUrl: optimizedDataUrl,
-          width: targetWidth,
-          height: targetHeight,
-          sizeBytes,
-        });
-      } catch (err) {
-        reject(err);
-      }
-    };
-    img.onerror = () => reject(new Error('Failed to process image canvas'));
-    img.src = dataUrl;
-  });
+  return {
+    dataUrl,
+    width: origWidth,
+    height: origHeight,
+    sizeBytes,
+  };
 }

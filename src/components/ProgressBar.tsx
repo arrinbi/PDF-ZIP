@@ -17,9 +17,7 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({ progress }) => {
       <div className="flex items-center justify-center gap-3">
         <Loader2 className="w-6 h-6 text-indigo-600 animate-spin" />
         <h3 className="text-base font-semibold text-slate-800">
-          {progress.stage === 'optimizing'
-            ? 'Optimizing Images...'
-            : 'Generating PDF Document...'}
+          Generating PDF Document...
         </h3>
       </div>
 

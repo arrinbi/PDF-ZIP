@@ -5,10 +5,7 @@ import { ImageList } from './components/ImageList';
 import { ProgressBar } from './components/ProgressBar';
 import { PdfPreview } from './components/PdfPreview';
 import type { GeneratedPdfResult, ImageItem, PdfOptions, ProcessingProgress } from './types';
-import {
-  optimizeSingleImage,
-  readImageData,
-} from './utils/imageOptimizer';
+import { readImageData } from './utils/imageOptimizer';
 import { generatePdfFromImages } from './utils/pdfGenerator';
 import { FileText, Sparkles, Sliders, Info } from 'lucide-react';
 
@@ -80,34 +77,11 @@ export const App: React.FC = () => {
     const totalCount = images.length;
 
     try {
-      // Step 1: Optimize images
-      const optimizedImages: ImageItem[] = [];
-      for (let i = 0; i < totalCount; i++) {
-        const item = images[i];
-        setProgress({
-          stage: 'optimizing',
-          currentStep: i + 1,
-          totalSteps: totalCount,
-          message: `Optimizing image ${i + 1} of ${totalCount}...`,
-        });
-
-        const opt = await optimizeSingleImage(item.previewUrl, item.width, item.height);
-        optimizedImages.push({
-          ...item,
-          optimizedDataUrl: opt.dataUrl,
-          optimizedWidth: opt.width,
-          optimizedHeight: opt.height,
-          optimizedSize: opt.sizeBytes,
-          status: 'done',
-        });
-      }
-
-      // Step 2: Generate PDF
       setProgress({
         stage: 'generating',
         currentStep: 0,
         totalSteps: totalCount,
-        message: 'Building optimized PDF file...',
+        message: 'Building PDF document...',
       });
 
       const options: PdfOptions = {
@@ -116,7 +90,7 @@ export const App: React.FC = () => {
         filename: pdfFilename || 'converted_images',
       };
 
-      const result = await generatePdfFromImages(optimizedImages, options, (curr, tot) => {
+      const result = await generatePdfFromImages(images, options, (curr, tot) => {
         setProgress({
           stage: 'generating',
           currentStep: curr,
@@ -180,9 +154,9 @@ export const App: React.FC = () => {
                 <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-sm mb-2">
                   <Sparkles className="w-4 h-4" />
                 </div>
-                <h3 className="text-sm font-semibold text-slate-900">HD & Sharp Quality</h3>
+                <h3 className="text-sm font-semibold text-slate-900">Original Quality</h3>
                 <p className="text-xs text-slate-500">
-                  Balanced Canvas compression preserves image text readability and visual fidelity.
+                  Images are preserved at 100% original quality without compression or downscaling.
                 </p>
               </div>
 
@@ -192,7 +166,7 @@ export const App: React.FC = () => {
                 </div>
                 <h3 className="text-sm font-semibold text-slate-900">Auto Fitting</h3>
                 <p className="text-xs text-slate-500">
-                  Fits each image perfectly to PDF pages without cropping or distoring aspect ratios.
+                  Fits each image perfectly to PDF pages without cropping or distorting aspect ratios.
                 </p>
               </div>
 
