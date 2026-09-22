@@ -17,44 +17,40 @@ export async function generatePdfFromImages(
   let pdf: jsPDF | null = null;
   const totalImages = images.length;
 
+  const baseWidthMm = 210; // Standard reference width in mm
+
   for (let i = 0; i < totalImages; i++) {
     const item = images[i];
     const imageDataUrl = item.optimizedDataUrl || item.previewUrl;
     const imgWidthPx = item.optimizedWidth || item.width;
     const imgHeightPx = item.optimizedHeight || item.height;
 
-    // Every PDF page is fixed to A4 Portrait
-    const format = 'a4';
-    const orientation = 'portrait';
+    const margin = options.margin || 0;
+    const availWidth = baseWidthMm - margin * 2;
+    const imgAspect = imgWidthPx / imgHeightPx;
+
+    // Fit to Image: dynamically size page height based on natural image aspect ratio
+    const drawW = availWidth;
+    const drawH = drawW / imgAspect;
+
+    const pageWidth = baseWidthMm;
+    const pageHeight = drawH + margin * 2;
+
+    const orientation = pageWidth > pageHeight ? 'landscape' : 'portrait';
 
     if (i === 0) {
       pdf = new jsPDF({
         orientation,
         unit: 'mm',
-        format,
+        format: [pageWidth, pageHeight],
       });
     } else if (pdf) {
-      pdf.addPage(format, orientation);
+      pdf.addPage([pageWidth, pageHeight], orientation);
     }
 
     if (pdf) {
-      const pageWidth = pdf.internal.pageSize.getWidth();
-      const pageHeight = pdf.internal.pageSize.getHeight();
-      const margin = options.margin || 0;
-
-      const availWidth = pageWidth - margin * 2;
-      const availHeight = pageHeight - margin * 2;
-
-      const imgAspect = imgWidthPx / imgHeightPx;
-
-      // Fit to Width behavior: image width always fills full usable width
-      const drawW = availWidth;
-      const drawH = drawW / imgAspect;
-
       const x = margin;
-      // Center vertically if image is shorter than usable page height; align to top if taller
-      const y = margin + Math.max(0, (availHeight - drawH) / 2);
-
+      const y = margin;
       pdf.addImage(imageDataUrl, 'JPEG', x, y, drawW, drawH);
     }
 

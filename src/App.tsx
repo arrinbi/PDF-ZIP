@@ -14,7 +14,7 @@ import { FileText, Sparkles, Sliders, Info } from 'lucide-react';
 
 export const App: React.FC = () => {
   const [images, setImages] = useState<ImageItem[]>([]);
-  const pageSize = 'a4';
+  const pageSize = 'fit';
   const [margin, setMargin] = useState<number>(0);
   const [pdfFilename, setPdfFilename] = useState<string>('converted_images');
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
@@ -251,7 +251,7 @@ export const App: React.FC = () => {
                     disabled
                     className="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-xs bg-slate-100 text-slate-600 cursor-not-allowed outline-hidden"
                   >
-                    <option value="a4">Standard A4 Portrait</option>
+                    <option value="fit">Fit to Image</option>
                   </select>
                 </div>
 
