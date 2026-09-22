@@ -82,7 +82,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({ onImagesSelected, 
         Select or Drop Images
       </h2>
       <p className="text-xs sm:text-sm text-slate-500 mb-4 max-w-sm">
-        Choose multiple images to combine into one compressed PDF.
+        Choose multiple images to combine into one PDF.
       </p>
 
       <button

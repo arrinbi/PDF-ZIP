@@ -14,7 +14,7 @@ export const Header: React.FC = () => {
               Img2PDF <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100">HD</span>
             </h1>
             <p className="text-xs text-slate-500 hidden sm:block">
-              Fast, high-quality & compressed Image to PDF converter
+              Fast, original-quality Image to PDF converter
             </p>
           </div>
         </div>

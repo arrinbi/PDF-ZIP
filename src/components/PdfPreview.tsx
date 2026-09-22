@@ -11,15 +11,8 @@ interface PdfPreviewProps {
 
 export const PdfPreview: React.FC<PdfPreviewProps> = ({
   pdfResult,
-  originalTotalSize,
   onReset,
 }) => {
-  const savingsBytes = originalTotalSize - pdfResult.sizeBytes;
-  const savingsPercent =
-    originalTotalSize > 0
-      ? Math.max(0, Math.round((savingsBytes / originalTotalSize) * 100))
-      : 0;
-
   return (
     <div className="bg-white border border-slate-200 rounded-2xl p-6 sm:p-8 shadow-md max-w-xl mx-auto space-y-6 text-center animate-fade-in">
       <div className="w-16 h-16 mx-auto rounded-2xl bg-emerald-100 text-emerald-600 flex items-center justify-center">
@@ -31,12 +24,12 @@ export const PdfPreview: React.FC<PdfPreviewProps> = ({
           Your PDF is Ready!
         </h2>
         <p className="text-xs sm:text-sm text-slate-500">
-          Optimized and generated locally without quality loss.
+          Generated locally in original quality without compression.
         </p>
       </div>
 
-      {/* Compression Summary Card */}
-      <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 grid grid-cols-2 sm:grid-cols-3 gap-3 text-left">
+      {/* Summary Card */}
+      <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 grid grid-cols-2 gap-3 text-left">
         <div>
           <span className="block text-[11px] font-medium text-slate-400 uppercase tracking-wider">
             Final PDF Size
@@ -54,17 +47,6 @@ export const PdfPreview: React.FC<PdfPreviewProps> = ({
             {pdfResult.pageCount} {pdfResult.pageCount === 1 ? 'Page' : 'Pages'}
           </span>
         </div>
-
-        {savingsPercent > 0 && (
-          <div className="col-span-2 sm:col-span-1">
-            <span className="block text-[11px] font-medium text-emerald-600 uppercase tracking-wider">
-              Space Saved
-            </span>
-            <span className="text-base font-bold text-emerald-600">
-              ~{savingsPercent}%
-            </span>
-          </div>
-        )}
       </div>
 
       {/* Main Download Action */}

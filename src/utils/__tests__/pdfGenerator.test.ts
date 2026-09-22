@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { generatePdfFromImages } from '../pdfGenerator';
+import { generatePdfFromImages, getImageFormat } from '../pdfGenerator';
 import type { ImageItem, PdfOptions } from '../../types';
 
 // Mock URL.createObjectURL for jsdom environment
@@ -8,39 +8,43 @@ if (typeof window !== 'undefined') {
 }
 
 describe('pdfGenerator utilities', () => {
-  const dummyDataUrl =
+  const dummyJpegDataUrl =
     'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=';
+
+  const dummyPngDataUrl =
+    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
 
   const sampleImages: ImageItem[] = [
     {
       id: 'img-1',
-      file: new File([], 'test1.jpg', { type: 'image/jpeg' }),
-      name: 'test1.jpg',
+      file: new File([], '01.jpg', { type: 'image/jpeg' }),
+      name: '01.jpg',
       size: 1024,
       type: 'image/jpeg',
-      previewUrl: dummyDataUrl,
+      previewUrl: dummyJpegDataUrl,
       width: 1200,
       height: 800,
-      optimizedDataUrl: dummyDataUrl,
-      optimizedWidth: 1200,
-      optimizedHeight: 800,
-      optimizedSize: 800,
     },
     {
       id: 'img-2',
-      file: new File([], 'test2.png', { type: 'image/png' }),
-      name: 'test2.png',
+      file: new File([], '02.png', { type: 'image/png' }),
+      name: '02.png',
       size: 2048,
       type: 'image/png',
-      previewUrl: dummyDataUrl,
+      previewUrl: dummyPngDataUrl,
       width: 800,
       height: 1200,
-      optimizedDataUrl: dummyDataUrl,
-      optimizedWidth: 800,
-      optimizedHeight: 1200,
-      optimizedSize: 1500,
     },
   ];
+
+  it('getImageFormat correctly identifies PNG, JPEG, WEBP formats', () => {
+    expect(getImageFormat('image/png')).toBe('PNG');
+    expect(getImageFormat('image/jpeg')).toBe('JPEG');
+    expect(getImageFormat('image/jpg')).toBe('JPEG');
+    expect(getImageFormat('image/webp')).toBe('WEBP');
+    expect(getImageFormat('', dummyPngDataUrl)).toBe('PNG');
+    expect(getImageFormat('', dummyJpegDataUrl)).toBe('JPEG');
+  });
 
   it('throws an error if no images are provided', async () => {
     const options: PdfOptions = { pageSize: 'fit', margin: 0 };
@@ -63,10 +67,9 @@ describe('pdfGenerator utilities', () => {
     expect(progressSpy).toHaveBeenLastCalledWith(2, 2);
   });
 
-  it('passes compression NONE to addImage to prevent double JPEG recompression', async () => {
-    const options: PdfOptions = { pageSize: 'fit', margin: 0 };
-    const result = await generatePdfFromImages([sampleImages[0]], options);
-    expect(result).toBeDefined();
+  it('preserves original file names on ImageItem objects', () => {
+    expect(sampleImages[0].name).toBe('01.jpg');
+    expect(sampleImages[1].name).toBe('02.png');
   });
 
   it('handles images with varied aspect ratios including tall, wide, and square without cropping', async () => {
@@ -74,31 +77,23 @@ describe('pdfGenerator utilities', () => {
     const mixedImages: ImageItem[] = [
       {
         id: 'img-tall',
-        file: new File([], 'tall.jpg', { type: 'image/jpeg' }),
-        name: 'tall.jpg',
+        file: new File([], '03.png', { type: 'image/png' }),
+        name: '03.png',
         size: 5000,
-        type: 'image/jpeg',
-        previewUrl: dummyDataUrl,
+        type: 'image/png',
+        previewUrl: dummyPngDataUrl,
         width: 1000,
         height: 3000,
-        optimizedDataUrl: dummyDataUrl,
-        optimizedWidth: 1000,
-        optimizedHeight: 3000,
-        optimizedSize: 5000,
       },
       {
         id: 'img-wide',
-        file: new File([], 'wide.jpg', { type: 'image/jpeg' }),
-        name: 'wide.jpg',
+        file: new File([], '04.jpg', { type: 'image/jpeg' }),
+        name: '04.jpg',
         size: 3000,
         type: 'image/jpeg',
-        previewUrl: dummyDataUrl,
+        previewUrl: dummyJpegDataUrl,
         width: 1200,
         height: 400,
-        optimizedDataUrl: dummyDataUrl,
-        optimizedWidth: 1200,
-        optimizedHeight: 400,
-        optimizedSize: 3000,
       },
     ];
 
