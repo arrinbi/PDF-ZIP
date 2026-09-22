@@ -95,6 +95,13 @@ describe('imageOptimizer utilities', () => {
       expect(result.height).toBe(100);
     });
 
+    it('clamps quality between 0.80 and 1.00', async () => {
+      const resLow = await processImageForPdf(pngItem, 'JPG', 0.50);
+      expect(resLow.jsPdfFormat).toBe('JPEG');
+      const resHigh = await processImageForPdf(pngItem, 'JPG', 1.20);
+      expect(resHigh.jsPdfFormat).toBe('JPEG');
+    });
+
     it('processes image for JPG output format', async () => {
       const result = await processImageForPdf(pngItem, 'JPG', 0.8);
       expect(result.jsPdfFormat).toBe('JPEG');

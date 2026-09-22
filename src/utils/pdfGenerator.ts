@@ -77,7 +77,8 @@ export async function generatePdfFromImages(
     if (pdf) {
       const x = margin;
       const y = margin;
-      pdf.addImage(imageDataUrl, format, x, y, drawW, drawH, undefined, 'NONE');
+      const compression = format === 'PNG' ? 'FAST' : 'NONE';
+      pdf.addImage(imageDataUrl, format, x, y, drawW, drawH, undefined, compression);
     }
 
     if (onProgress) {

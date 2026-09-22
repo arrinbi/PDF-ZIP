@@ -199,8 +199,8 @@ export async function processImageForPdf(
         jsPdfFormat = 'JPEG';
       }
 
-      // Clamp quality value between 0.5 and 1.0
-      const clampedQuality = Math.max(0.5, Math.min(1.0, quality));
+      // Clamp quality value between 0.8 and 1.0
+      const clampedQuality = Math.max(0.8, Math.min(1.0, quality));
 
       let encodedDataUrl = canvas.toDataURL(mimeType, clampedQuality);
 

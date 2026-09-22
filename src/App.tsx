@@ -372,7 +372,7 @@ export const App: React.FC = () => {
 
                         <input
                           type="range"
-                          min="0.50"
+                          min="0.80"
                           max="1.00"
                           step="0.05"
                           value={quality}
@@ -384,7 +384,7 @@ export const App: React.FC = () => {
                         />
 
                         <div className="flex justify-between text-[10px] text-slate-400 mt-0.5">
-                          <span>50% (Smaller Size)</span>
+                          <span>80% (Smaller Size)</span>
                           <span>100% (Best Quality)</span>
                         </div>
 
