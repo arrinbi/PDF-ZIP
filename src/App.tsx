@@ -4,18 +4,28 @@ import { ImageUploader } from './components/ImageUploader';
 import { ImageList } from './components/ImageList';
 import { ProgressBar } from './components/ProgressBar';
 import { PdfPreview } from './components/PdfPreview';
-import type { GeneratedPdfResult, ImageItem, OutputFormat, PdfOptions, ProcessingProgress } from './types';
+import type {
+  ExportMode,
+  ExportResult,
+  ImageItem,
+  OutputFormat,
+  PdfOptions,
+  ProcessingProgress,
+} from './types';
 import { readImageData } from './utils/imageOptimizer';
 import { generatePdfFromImages } from './utils/pdfGenerator';
-import { FileText, Sparkles, Sliders, Info, Image as ImageIcon } from 'lucide-react';
+import { generateZipFromImages } from './utils/zipGenerator';
+import { FileText, Sparkles, Sliders, Info, Image as ImageIcon, Archive } from 'lucide-react';
 
 export const App: React.FC = () => {
   const [images, setImages] = useState<ImageItem[]>([]);
+  const [exportMode, setExportMode] = useState<ExportMode>('pdf');
   const pageSize = 'fit';
   const [margin, setMargin] = useState<number>(0);
   const [outputFormat, setOutputFormat] = useState<OutputFormat>('JPG');
   const [quality, setQuality] = useState<number>(0.85); // Default 85%
   const [pdfFilename, setPdfFilename] = useState<string>('converted_images');
+  const [zipFilename, setZipFilename] = useState<string>('images');
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [progress, setProgress] = useState<ProcessingProgress>({
     stage: 'idle',
@@ -23,7 +33,7 @@ export const App: React.FC = () => {
     totalSteps: 0,
     message: '',
   });
-  const [pdfResult, setPdfResult] = useState<GeneratedPdfResult | null>(null);
+  const [exportResult, setExportResult] = useState<ExportResult | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const handleImagesSelected = async (files: File[]) => {
@@ -46,7 +56,7 @@ export const App: React.FC = () => {
         });
       }
       setImages((prev) => [...prev, ...newItems]);
-    } catch (err: any) {
+    } catch {
       setErrorMessage('Failed to read selected images. Please try valid JPG, PNG, or WEBP images.');
     }
   };
@@ -67,46 +77,73 @@ export const App: React.FC = () => {
 
   const handleClearAll = () => {
     setImages([]);
-    setPdfResult(null);
+    setExportResult(null);
     setErrorMessage(null);
   };
 
-  const handleCreatePdf = async () => {
-    if (images.length === 0) return;
+  const handleExport = async () => {
+    if (images.length === 0) {
+      setErrorMessage('Please upload at least one image before exporting.');
+      return;
+    }
 
     setIsProcessing(true);
     setErrorMessage(null);
     const totalCount = images.length;
 
     try {
-      setProgress({
-        stage: 'generating',
-        currentStep: 0,
-        totalSteps: totalCount,
-        message: 'Building PDF document...',
-      });
-
-      const options: PdfOptions = {
-        pageSize,
-        margin,
-        filename: pdfFilename || 'converted_images',
-        outputFormat,
-        quality,
-      };
-
-      const result = await generatePdfFromImages(images, options, (curr, tot) => {
+      if (exportMode === 'pdf') {
         setProgress({
           stage: 'generating',
-          currentStep: curr,
-          totalSteps: tot,
-          message: `Adding page ${curr} of ${tot} to PDF...`,
+          currentStep: 0,
+          totalSteps: totalCount,
+          message: 'Building PDF document...',
         });
-      });
 
-      setPdfResult(result);
+        const options: PdfOptions = {
+          pageSize,
+          margin,
+          filename: pdfFilename || 'converted_images',
+          outputFormat,
+          quality,
+        };
+
+        const result = await generatePdfFromImages(images, options, (curr, tot) => {
+          setProgress({
+            stage: 'generating',
+            currentStep: curr,
+            totalSteps: tot,
+            message: `Adding page ${curr} of ${tot} to PDF...`,
+          });
+        });
+
+        setExportResult({ mode: 'pdf', pdf: result });
+      } else {
+        setProgress({
+          stage: 'generating',
+          currentStep: 0,
+          totalSteps: totalCount,
+          message: 'Creating ZIP archive...',
+        });
+
+        const result = await generateZipFromImages(
+          images,
+          { filename: zipFilename || 'images' },
+          (curr, tot) => {
+            setProgress({
+              stage: 'generating',
+              currentStep: curr,
+              totalSteps: tot,
+              message: `Adding file ${curr} of ${tot} to ZIP...`,
+            });
+          }
+        );
+
+        setExportResult({ mode: 'zip', zip: result });
+      }
     } catch (err: any) {
       console.error(err);
-      setErrorMessage(err.message || 'An error occurred during PDF generation.');
+      setErrorMessage(err.message || 'An error occurred during export.');
     } finally {
       setIsProcessing(false);
       setProgress({
@@ -130,23 +167,26 @@ export const App: React.FC = () => {
             <span>{errorMessage}</span>
             <button
               onClick={() => setErrorMessage(null)}
-              className="text-xs font-semibold underline ml-2"
+              className="text-xs font-semibold underline ml-2 cursor-pointer"
             >
               Dismiss
             </button>
           </div>
         )}
 
-        {/* View 1: Generated PDF Result */}
-        {pdfResult ? (
+        {/* View 1: Generated Export Result */}
+        {exportResult ? (
           <PdfPreview
-            pdfResult={pdfResult}
+            exportResult={exportResult}
             originalTotalSize={totalOriginalSizeBytes}
-            onReset={() => setPdfResult(null)}
+            onReset={() => setExportResult(null)}
           />
         ) : isProcessing ? (
           /* View 2: Processing Progress */
-          <ProgressBar progress={progress} />
+          <ProgressBar
+            progress={progress}
+            title={exportMode === 'zip' ? 'Creating ZIP Archive...' : 'Generating PDF Document...'}
+          />
         ) : images.length === 0 ? (
           /* View 3: Empty State / Initial File Dropzone */
           <div className="space-y-6">
@@ -158,19 +198,19 @@ export const App: React.FC = () => {
                 <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-sm mb-2">
                   <Sparkles className="w-4 h-4" />
                 </div>
-                <h3 className="text-sm font-semibold text-slate-900">Custom Quality & Format</h3>
+                <h3 className="text-sm font-semibold text-slate-900">PDF & ZIP Export</h3>
                 <p className="text-xs text-slate-500">
-                  Choose JPG, PNG, or WEBP output and fine-tune image quality without altering page layout.
+                  Convert images to custom PDF documents or export original image files as a ordered ZIP archive.
                 </p>
               </div>
 
               <div className="bg-white border border-slate-200/80 rounded-xl p-4 space-y-1">
                 <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-sm mb-2">
-                  <FileText className="w-4 h-4" />
+                  <Archive className="w-4 h-4" />
                 </div>
-                <h3 className="text-sm font-semibold text-slate-900">Auto Fitting</h3>
+                <h3 className="text-sm font-semibold text-slate-900">Original Quality ZIP</h3>
                 <p className="text-xs text-slate-500">
-                  Fits each image perfectly to PDF pages without cropping or distorting aspect ratios.
+                  ZIP export keeps original uploaded files byte-for-byte without compression, resizing, or conversion.
                 </p>
               </div>
 
@@ -180,7 +220,7 @@ export const App: React.FC = () => {
                 </div>
                 <h3 className="text-sm font-semibold text-slate-900">100% On-Device</h3>
                 <p className="text-xs text-slate-500">
-                  Files stay on your phone or PC. No server uploads required.
+                  Files stay on your device. All processing happens entirely inside your web browser.
                 </p>
               </div>
             </div>
@@ -191,131 +231,197 @@ export const App: React.FC = () => {
             <div className="flex items-center justify-between bg-white border border-slate-200 rounded-xl p-3 sm:p-4">
               <ImageUploader onImagesSelected={handleImagesSelected} isCompact />
               <button
-                onClick={handleCreatePdf}
+                onClick={handleExport}
                 className="py-2.5 px-5 bg-indigo-600 hover:bg-indigo-700 active:scale-98 text-white font-semibold text-sm sm:text-base rounded-xl shadow-md shadow-indigo-200 transition-all flex items-center gap-2 cursor-pointer"
               >
-                <Sparkles className="w-4 h-4" />
-                <span>Create PDF ({images.length})</span>
+                {exportMode === 'zip' ? <Archive className="w-4 h-4" /> : <Sparkles className="w-4 h-4" />}
+                <span>
+                  {exportMode === 'zip'
+                    ? `Export ZIP (${images.length})`
+                    : `Create PDF (${images.length})`}
+                </span>
               </button>
             </div>
 
-            {/* PDF Layout & Image Options */}
+            {/* Layout & Export Options Card */}
             <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-4">
-              <div className="flex items-center gap-2 text-slate-800 font-semibold text-sm">
-                <Sliders className="w-4 h-4 text-indigo-600" />
-                <span>PDF Options</span>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">
-                    PDF Document Name
-                  </label>
-                  <input
-                    type="text"
-                    value={pdfFilename}
-                    onChange={(e) => setPdfFilename(e.target.value)}
-                    placeholder="my-converted-pdf"
-                    className="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-xs focus:ring-2 focus:ring-indigo-500 outline-hidden"
-                  />
+              {/* Header with Export Mode Toggle */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-100 pb-3 gap-2">
+                <div className="flex items-center gap-2 text-slate-800 font-semibold text-sm">
+                  <Sliders className="w-4 h-4 text-indigo-600" />
+                  <span>Export Options</span>
                 </div>
 
-                <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">
-                    Page Sizing
-                  </label>
-                  <select
-                    value={pageSize}
-                    disabled
-                    className="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-xs bg-slate-100 text-slate-600 cursor-not-allowed outline-hidden"
-                  >
-                    <option value="fit">Fit to Image</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">
-                    Page Margin
-                  </label>
-                  <select
-                    value={margin}
-                    onChange={(e) => setMargin(Number(e.target.value))}
-                    className="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-xs bg-white focus:ring-2 focus:ring-indigo-500 outline-hidden"
-                  >
-                    <option value={0}>No Margin (Full Bleed)</option>
-                    <option value={5}>Small (5mm)</option>
-                    <option value={10}>Standard (10mm)</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="border-t border-slate-100 pt-3">
-                <div className="flex items-center gap-2 text-slate-800 font-semibold text-xs mb-3">
-                  <ImageIcon className="w-3.5 h-3.5 text-indigo-600" />
-                  <span>Image Output & Compression</span>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {/* Format Selector */}
-                  <div>
-                    <label className="block text-xs font-medium text-slate-600 mb-1">
-                      Output Format
-                    </label>
-                    <div className="grid grid-cols-3 gap-2">
-                      {(['JPG', 'PNG', 'WEBP'] as OutputFormat[]).map((fmt) => (
-                        <button
-                          key={fmt}
-                          type="button"
-                          onClick={() => setOutputFormat(fmt)}
-                          className={`py-1.5 px-3 text-xs font-medium rounded-lg border transition-all cursor-pointer text-center ${
-                            outputFormat === fmt
-                              ? 'bg-indigo-50 border-indigo-500 text-indigo-700 font-semibold shadow-xs'
-                              : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
-                          }`}
-                        >
-                          {fmt}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Quality Slider */}
-                  <div>
-                    <div className="flex justify-between items-center mb-1">
-                      <label className="block text-xs font-medium text-slate-600">
-                        Image Quality
-                      </label>
-                      <span className="text-xs font-bold text-indigo-600">
-                        {Math.round(quality * 100)}%
-                      </span>
-                    </div>
-
-                    <input
-                      type="range"
-                      min="0.50"
-                      max="1.00"
-                      step="0.05"
-                      value={quality}
-                      onChange={(e) => setQuality(parseFloat(e.target.value))}
-                      disabled={outputFormat === 'PNG'}
-                      className={`w-full accent-indigo-600 ${
-                        outputFormat === 'PNG' ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-medium text-slate-500">Export as:</span>
+                  <div className="inline-flex p-1 bg-slate-100 rounded-xl border border-slate-200">
+                    <button
+                      type="button"
+                      onClick={() => setExportMode('pdf')}
+                      className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
+                        exportMode === 'pdf'
+                          ? 'bg-white text-indigo-700 shadow-xs'
+                          : 'text-slate-600 hover:text-slate-900'
                       }`}
-                    />
-
-                    <div className="flex justify-between text-[10px] text-slate-400 mt-0.5">
-                      <span>50% (Smaller Size)</span>
-                      <span>100% (Best Quality)</span>
-                    </div>
-
-                    {outputFormat === 'PNG' && (
-                      <p className="text-[11px] text-indigo-600 mt-1">
-                        PNG uses lossless format. Original crispness is retained.
-                      </p>
-                    )}
+                    >
+                      <FileText className="w-3.5 h-3.5" />
+                      <span>PDF</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setExportMode('zip')}
+                      className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
+                        exportMode === 'zip'
+                          ? 'bg-white text-indigo-700 shadow-xs'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      <Archive className="w-3.5 h-3.5" />
+                      <span>ZIP</span>
+                    </button>
                   </div>
                 </div>
               </div>
+
+              {exportMode === 'pdf' ? (
+                /* PDF Options */
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-slate-600 mb-1">
+                        PDF Document Name
+                      </label>
+                      <input
+                        type="text"
+                        value={pdfFilename}
+                        onChange={(e) => setPdfFilename(e.target.value)}
+                        placeholder="my-converted-pdf"
+                        className="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-xs focus:ring-2 focus:ring-indigo-500 outline-hidden"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-slate-600 mb-1">
+                        Page Sizing
+                      </label>
+                      <select
+                        value={pageSize}
+                        disabled
+                        className="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-xs bg-slate-100 text-slate-600 cursor-not-allowed outline-hidden"
+                      >
+                        <option value="fit">Fit to Image</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-slate-600 mb-1">
+                        Page Margin
+                      </label>
+                      <select
+                        value={margin}
+                        onChange={(e) => setMargin(Number(e.target.value))}
+                        className="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-xs bg-white focus:ring-2 focus:ring-indigo-500 outline-hidden"
+                      >
+                        <option value={0}>No Margin (Full Bleed)</option>
+                        <option value={5}>Small (5mm)</option>
+                        <option value={10}>Standard (10mm)</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="border-t border-slate-100 pt-3">
+                    <div className="flex items-center gap-2 text-slate-800 font-semibold text-xs mb-3">
+                      <ImageIcon className="w-3.5 h-3.5 text-indigo-600" />
+                      <span>Image Output & Compression</span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {/* Format Selector */}
+                      <div>
+                        <label className="block text-xs font-medium text-slate-600 mb-1">
+                          Output Format
+                        </label>
+                        <div className="grid grid-cols-3 gap-2">
+                          {(['JPG', 'PNG', 'WEBP'] as OutputFormat[]).map((fmt) => (
+                            <button
+                              key={fmt}
+                              type="button"
+                              onClick={() => setOutputFormat(fmt)}
+                              className={`py-1.5 px-3 text-xs font-medium rounded-lg border transition-all cursor-pointer text-center ${
+                                outputFormat === fmt
+                                  ? 'bg-indigo-50 border-indigo-500 text-indigo-700 font-semibold shadow-xs'
+                                  : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                              }`}
+                            >
+                              {fmt}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Quality Slider */}
+                      <div>
+                        <div className="flex justify-between items-center mb-1">
+                          <label className="block text-xs font-medium text-slate-600">
+                            Image Quality
+                          </label>
+                          <span className="text-xs font-bold text-indigo-600">
+                            {Math.round(quality * 100)}%
+                          </span>
+                        </div>
+
+                        <input
+                          type="range"
+                          min="0.50"
+                          max="1.00"
+                          step="0.05"
+                          value={quality}
+                          onChange={(e) => setQuality(parseFloat(e.target.value))}
+                          disabled={outputFormat === 'PNG'}
+                          className={`w-full accent-indigo-600 ${
+                            outputFormat === 'PNG' ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
+                          }`}
+                        />
+
+                        <div className="flex justify-between text-[10px] text-slate-400 mt-0.5">
+                          <span>50% (Smaller Size)</span>
+                          <span>100% (Best Quality)</span>
+                        </div>
+
+                        {outputFormat === 'PNG' && (
+                          <p className="text-[11px] text-indigo-600 mt-1">
+                            PNG uses lossless format. Original crispness is retained.
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                /* ZIP Options */
+                <div className="space-y-3">
+                  <div className="max-w-xs">
+                    <label className="block text-xs font-medium text-slate-600 mb-1">
+                      ZIP Archive Name
+                    </label>
+                    <input
+                      type="text"
+                      value={zipFilename}
+                      onChange={(e) => setZipFilename(e.target.value)}
+                      placeholder="images"
+                      className="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-xs focus:ring-2 focus:ring-indigo-500 outline-hidden"
+                    />
+                  </div>
+
+                  <div className="bg-indigo-50/70 border border-indigo-100 rounded-lg p-3 text-xs text-indigo-900 flex items-start gap-2">
+                    <Info className="w-4 h-4 text-indigo-600 shrink-0 mt-0.5" />
+                    <span>
+                      Original uploaded files will be archived byte-for-byte in your current preview order
+                      (01, 02, 03...) without any compression, resizing, or quality loss.
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Image List */}

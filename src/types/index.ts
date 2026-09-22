@@ -21,12 +21,18 @@ export interface OptimizationOptions {
 
 export type OutputFormat = 'JPG' | 'PNG' | 'WEBP';
 
+export type ExportMode = 'pdf' | 'zip';
+
 export interface PdfOptions {
   pageSize: 'fit' | 'a4' | 'letter';
   margin: number; // margin in mm (for A4/Letter)
   filename?: string;
   outputFormat?: OutputFormat;
   quality?: number; // 0.50 to 1.00 (50% to 100%), default 0.85
+}
+
+export interface ZipOptions {
+  filename?: string;
 }
 
 export interface ProcessingProgress {
@@ -43,3 +49,15 @@ export interface GeneratedPdfResult {
   filename: string;
   pageCount: number;
 }
+
+export interface GeneratedZipResult {
+  blob: Blob;
+  url: string;
+  sizeBytes: number;
+  filename: string;
+  fileCount: number;
+}
+
+export type ExportResult =
+  | { mode: 'pdf'; pdf: GeneratedPdfResult }
+  | { mode: 'zip'; zip: GeneratedZipResult };

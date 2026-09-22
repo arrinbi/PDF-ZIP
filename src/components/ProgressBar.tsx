@@ -4,9 +4,10 @@ import type { ProcessingProgress } from '../types';
 
 interface ProgressBarProps {
   progress: ProcessingProgress;
+  title?: string;
 }
 
-export const ProgressBar: React.FC<ProgressBarProps> = ({ progress }) => {
+export const ProgressBar: React.FC<ProgressBarProps> = ({ progress, title }) => {
   const percentage =
     progress.totalSteps > 0
       ? Math.min(100, Math.round((progress.currentStep / progress.totalSteps) * 100))
@@ -17,7 +18,7 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({ progress }) => {
       <div className="flex items-center justify-center gap-3">
         <Loader2 className="w-6 h-6 text-indigo-600 animate-spin" />
         <h3 className="text-base font-semibold text-slate-800">
-          Generating PDF Document...
+          {title || 'Processing...'}
         </h3>
       </div>
 
