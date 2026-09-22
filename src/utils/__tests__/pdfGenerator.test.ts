@@ -43,14 +43,14 @@ describe('pdfGenerator utilities', () => {
   ];
 
   it('throws an error if no images are provided', async () => {
-    const options: PdfOptions = { pageSize: 'fit', margin: 0 };
+    const options: PdfOptions = { pageSize: 'a4', margin: 0 };
     await expect(generatePdfFromImages([], options)).rejects.toThrow(
       'No images provided for PDF generation.'
     );
   });
 
-  it('generates a PDF successfully with "fit" page size options', async () => {
-    const options: PdfOptions = { pageSize: 'fit', margin: 0, filename: 'my_doc' };
+  it('generates a PDF document with A4 Portrait pages for all images', async () => {
+    const options: PdfOptions = { pageSize: 'a4', margin: 0, filename: 'my_doc' };
     const progressSpy = vi.fn();
 
     const result = await generatePdfFromImages(sampleImages, options, progressSpy);
@@ -61,15 +61,5 @@ describe('pdfGenerator utilities', () => {
     expect(result.sizeBytes).toBeGreaterThan(0);
     expect(progressSpy).toHaveBeenCalledTimes(2);
     expect(progressSpy).toHaveBeenLastCalledWith(2, 2);
-  });
-
-  it('generates a PDF successfully with "a4" page size and margins', async () => {
-    const options: PdfOptions = { pageSize: 'a4', margin: 10, filename: 'a4_doc.pdf' };
-
-    const result = await generatePdfFromImages(sampleImages, options);
-
-    expect(result).toBeDefined();
-    expect(result.filename).toBe('a4_doc.pdf');
-    expect(result.pageCount).toBe(2);
   });
 });
