@@ -67,6 +67,20 @@ describe('pdfGenerator utilities', () => {
     expect(progressSpy).toHaveBeenLastCalledWith(2, 2);
   });
 
+  it('accepts outputFormat and quality options', async () => {
+    const options: PdfOptions = {
+      pageSize: 'fit',
+      margin: 0,
+      filename: 'my_doc',
+      outputFormat: 'JPG',
+      quality: 0.75,
+    };
+
+    const result = await generatePdfFromImages(sampleImages, options);
+    expect(result).toBeDefined();
+    expect(result.pageCount).toBe(2);
+  });
+
   it('preserves original file names on ImageItem objects', () => {
     expect(sampleImages[0].name).toBe('01.jpg');
     expect(sampleImages[1].name).toBe('02.png');

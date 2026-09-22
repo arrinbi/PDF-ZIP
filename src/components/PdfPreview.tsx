@@ -24,7 +24,7 @@ export const PdfPreview: React.FC<PdfPreviewProps> = ({
           Your PDF is Ready!
         </h2>
         <p className="text-xs sm:text-sm text-slate-500">
-          Generated locally in original quality without compression.
+          Generated locally on your device with your selected format and quality.
         </p>
       </div>
 

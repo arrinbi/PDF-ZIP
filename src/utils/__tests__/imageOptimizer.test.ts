@@ -3,13 +3,15 @@ import {
   calculateTargetDimensions,
   formatFileSize,
   optimizeSingleImage,
+  processImageForPdf,
   DEFAULT_MAX_DIMENSION,
   DEFAULT_QUALITY,
 } from '../imageOptimizer';
+import type { ImageItem } from '../../types';
 
 describe('imageOptimizer utilities', () => {
   it('uses expected default quality and max dimension constants', () => {
-    expect(DEFAULT_QUALITY).toBe(1.0);
+    expect(DEFAULT_QUALITY).toBe(0.85);
     expect(DEFAULT_MAX_DIMENSION).toBe(8192);
   });
 
@@ -70,6 +72,41 @@ describe('imageOptimizer utilities', () => {
       expect(result.width).toBe(100);
       expect(result.height).toBe(200);
       expect(result.sizeBytes).toBeGreaterThan(0);
+    });
+  });
+
+  describe('processImageForPdf', () => {
+    const pngItem: ImageItem = {
+      id: 'png-1',
+      file: new File([], 'test.png', { type: 'image/png' }),
+      name: 'test.png',
+      size: 100,
+      type: 'image/png',
+      previewUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+      width: 100,
+      height: 100,
+    };
+
+    it('returns original PNG dataUrl directly when PNG output format is selected for PNG source', async () => {
+      const result = await processImageForPdf(pngItem, 'PNG', 0.85);
+      expect(result.jsPdfFormat).toBe('PNG');
+      expect(result.dataUrl).toBe(pngItem.previewUrl);
+      expect(result.width).toBe(100);
+      expect(result.height).toBe(100);
+    });
+
+    it('processes image for JPG output format', async () => {
+      const result = await processImageForPdf(pngItem, 'JPG', 0.8);
+      expect(result.jsPdfFormat).toBe('JPEG');
+      expect(result.width).toBe(100);
+      expect(result.height).toBe(100);
+    });
+
+    it('processes image for WEBP output format', async () => {
+      const result = await processImageForPdf(pngItem, 'WEBP', 0.85);
+      expect(['WEBP', 'JPEG']).toContain(result.jsPdfFormat);
+      expect(result.width).toBe(100);
+      expect(result.height).toBe(100);
     });
   });
 });

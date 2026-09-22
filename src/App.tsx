@@ -4,15 +4,17 @@ import { ImageUploader } from './components/ImageUploader';
 import { ImageList } from './components/ImageList';
 import { ProgressBar } from './components/ProgressBar';
 import { PdfPreview } from './components/PdfPreview';
-import type { GeneratedPdfResult, ImageItem, PdfOptions, ProcessingProgress } from './types';
+import type { GeneratedPdfResult, ImageItem, OutputFormat, PdfOptions, ProcessingProgress } from './types';
 import { readImageData } from './utils/imageOptimizer';
 import { generatePdfFromImages } from './utils/pdfGenerator';
-import { FileText, Sparkles, Sliders, Info } from 'lucide-react';
+import { FileText, Sparkles, Sliders, Info, Image as ImageIcon } from 'lucide-react';
 
 export const App: React.FC = () => {
   const [images, setImages] = useState<ImageItem[]>([]);
   const pageSize = 'fit';
   const [margin, setMargin] = useState<number>(0);
+  const [outputFormat, setOutputFormat] = useState<OutputFormat>('JPG');
+  const [quality, setQuality] = useState<number>(0.85); // Default 85%
   const [pdfFilename, setPdfFilename] = useState<string>('converted_images');
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [progress, setProgress] = useState<ProcessingProgress>({
@@ -88,6 +90,8 @@ export const App: React.FC = () => {
         pageSize,
         margin,
         filename: pdfFilename || 'converted_images',
+        outputFormat,
+        quality,
       };
 
       const result = await generatePdfFromImages(images, options, (curr, tot) => {
@@ -154,9 +158,9 @@ export const App: React.FC = () => {
                 <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-sm mb-2">
                   <Sparkles className="w-4 h-4" />
                 </div>
-                <h3 className="text-sm font-semibold text-slate-900">Original Quality</h3>
+                <h3 className="text-sm font-semibold text-slate-900">Custom Quality & Format</h3>
                 <p className="text-xs text-slate-500">
-                  Images are preserved at 100% original quality without compression or downscaling.
+                  Choose JPG, PNG, or WEBP output and fine-tune image quality without altering page layout.
                 </p>
               </div>
 
@@ -195,8 +199,8 @@ export const App: React.FC = () => {
               </button>
             </div>
 
-            {/* PDF Layout Options */}
-            <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-3">
+            {/* PDF Layout & Image Options */}
+            <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-4">
               <div className="flex items-center gap-2 text-slate-800 font-semibold text-sm">
                 <Sliders className="w-4 h-4 text-indigo-600" />
                 <span>PDF Options</span>
@@ -242,6 +246,74 @@ export const App: React.FC = () => {
                     <option value={5}>Small (5mm)</option>
                     <option value={10}>Standard (10mm)</option>
                   </select>
+                </div>
+              </div>
+
+              <div className="border-t border-slate-100 pt-3">
+                <div className="flex items-center gap-2 text-slate-800 font-semibold text-xs mb-3">
+                  <ImageIcon className="w-3.5 h-3.5 text-indigo-600" />
+                  <span>Image Output & Compression</span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Format Selector */}
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">
+                      Output Format
+                    </label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {(['JPG', 'PNG', 'WEBP'] as OutputFormat[]).map((fmt) => (
+                        <button
+                          key={fmt}
+                          type="button"
+                          onClick={() => setOutputFormat(fmt)}
+                          className={`py-1.5 px-3 text-xs font-medium rounded-lg border transition-all cursor-pointer text-center ${
+                            outputFormat === fmt
+                              ? 'bg-indigo-50 border-indigo-500 text-indigo-700 font-semibold shadow-xs'
+                              : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                          }`}
+                        >
+                          {fmt}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Quality Slider */}
+                  <div>
+                    <div className="flex justify-between items-center mb-1">
+                      <label className="block text-xs font-medium text-slate-600">
+                        Image Quality
+                      </label>
+                      <span className="text-xs font-bold text-indigo-600">
+                        {Math.round(quality * 100)}%
+                      </span>
+                    </div>
+
+                    <input
+                      type="range"
+                      min="0.50"
+                      max="1.00"
+                      step="0.05"
+                      value={quality}
+                      onChange={(e) => setQuality(parseFloat(e.target.value))}
+                      disabled={outputFormat === 'PNG'}
+                      className={`w-full accent-indigo-600 ${
+                        outputFormat === 'PNG' ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
+                      }`}
+                    />
+
+                    <div className="flex justify-between text-[10px] text-slate-400 mt-0.5">
+                      <span>50% (Smaller Size)</span>
+                      <span>100% (Best Quality)</span>
+                    </div>
+
+                    {outputFormat === 'PNG' && (
+                      <p className="text-[11px] text-indigo-600 mt-1">
+                        PNG uses lossless format. Original crispness is retained.
+                      </p>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>

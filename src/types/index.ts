@@ -19,10 +19,14 @@ export interface OptimizationOptions {
   quality?: number; // 0.1 to 1.0, default 0.82
 }
 
+export type OutputFormat = 'JPG' | 'PNG' | 'WEBP';
+
 export interface PdfOptions {
   pageSize: 'fit' | 'a4' | 'letter';
   margin: number; // margin in mm (for A4/Letter)
   filename?: string;
+  outputFormat?: OutputFormat;
+  quality?: number; // 0.50 to 1.00 (50% to 100%), default 0.85
 }
 
 export interface ProcessingProgress {

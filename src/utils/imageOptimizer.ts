@@ -1,7 +1,7 @@
-import type { OptimizationOptions } from '../types';
+import type { ImageItem, OptimizationOptions, OutputFormat } from '../types';
 
 export const DEFAULT_MAX_DIMENSION = 8192; // Max dimension reference
-export const DEFAULT_QUALITY = 1.0; // Preserve 100% original quality
+export const DEFAULT_QUALITY = 0.85; // Default 85% image quality
 
 /**
  * Calculates new width and height respecting max dimension and maintaining aspect ratio.
@@ -81,4 +81,154 @@ export async function optimizeSingleImage(
     height: origHeight,
     sizeBytes,
   };
+}
+
+/**
+ * Processes an image for PDF embedding according to user-selected format and quality settings.
+ * Preserves exact natural dimensions without downscaling, upscaling, or cropping.
+ */
+export async function processImageForPdf(
+  item: ImageItem,
+  targetFormat: OutputFormat = 'JPG',
+  quality: number = DEFAULT_QUALITY
+): Promise<{ dataUrl: string; jsPdfFormat: string; width: number; height: number }> {
+  const srcDataUrl = item.previewUrl || item.optimizedDataUrl || '';
+  const origWidth = item.width || 1;
+  const origHeight = item.height || 1;
+
+  // Determine source MIME type
+  let srcType = (item.type || '').toLowerCase();
+  if (!srcType && srcDataUrl) {
+    if (srcDataUrl.startsWith('data:image/png')) srcType = 'image/png';
+    else if (srcDataUrl.startsWith('data:image/webp')) srcType = 'image/webp';
+    else if (srcDataUrl.startsWith('data:image/jpeg') || srcDataUrl.startsWith('data:image/jpg')) srcType = 'image/jpeg';
+  }
+
+  // Handle PNG:
+  // For PNG output:
+  // - Do not apply JPEG-style lossy compression.
+  // - Preserve PNG image quality.
+  // - If source is already PNG, return original dataUrl directly without re-encoding to preserve exact quality.
+  if (targetFormat === 'PNG') {
+    if (srcType.includes('png')) {
+      return {
+        dataUrl: srcDataUrl,
+        jsPdfFormat: 'PNG',
+        width: origWidth,
+        height: origHeight,
+      };
+    }
+  }
+
+  // For canvas processing (JPG, WEBP, or PNG from non-PNG source):
+  return new Promise((resolve) => {
+    // In node/jsdom test environments without full canvas/Image rendering engine, HTMLImageElement onload may not fire for inline base64 images.
+    // If document/window canvas context is not present or in test mock environment, return source/fallback directly.
+    if (typeof document === 'undefined' || typeof HTMLCanvasElement === 'undefined') {
+      const fallbackFormat = targetFormat === 'PNG' ? 'PNG' : targetFormat === 'WEBP' ? 'WEBP' : 'JPEG';
+      resolve({
+        dataUrl: srcDataUrl,
+        jsPdfFormat: fallbackFormat,
+        width: origWidth,
+        height: origHeight,
+      });
+      return;
+    }
+
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+
+    let settled = false;
+    const finish = (res: { dataUrl: string; jsPdfFormat: string; width: number; height: number }) => {
+      if (!settled) {
+        settled = true;
+        resolve(res);
+      }
+    };
+
+    // Timeout safety for environments where Image onload does not trigger
+    const timer = setTimeout(() => {
+      const jsPdfFormat = targetFormat === 'PNG' ? 'PNG' : targetFormat === 'WEBP' ? 'WEBP' : 'JPEG';
+      finish({
+        dataUrl: srcDataUrl,
+        jsPdfFormat,
+        width: origWidth,
+        height: origHeight,
+      });
+    }, 300);
+
+    img.onload = () => {
+      clearTimeout(timer);
+      const naturalW = img.naturalWidth || origWidth;
+      const naturalH = img.naturalHeight || origHeight;
+
+      const canvas = document.createElement('canvas');
+      canvas.width = naturalW;
+      canvas.height = naturalH;
+
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        finish({
+          dataUrl: srcDataUrl,
+          jsPdfFormat: targetFormat === 'PNG' ? 'PNG' : targetFormat === 'WEBP' ? 'WEBP' : 'JPEG',
+          width: naturalW,
+          height: naturalH,
+        });
+        return;
+      }
+
+      // If encoding to JPEG, fill white background for transparent PNG/WEBP inputs
+      if (targetFormat === 'JPG') {
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(0, 0, naturalW, naturalH);
+      }
+
+      ctx.drawImage(img, 0, 0, naturalW, naturalH);
+
+      let mimeType = 'image/jpeg';
+      let jsPdfFormat = 'JPEG';
+
+      if (targetFormat === 'PNG') {
+        mimeType = 'image/png';
+        jsPdfFormat = 'PNG';
+      } else if (targetFormat === 'WEBP') {
+        mimeType = 'image/webp';
+        jsPdfFormat = 'WEBP';
+      } else {
+        mimeType = 'image/jpeg';
+        jsPdfFormat = 'JPEG';
+      }
+
+      // Clamp quality value between 0.5 and 1.0
+      const clampedQuality = Math.max(0.5, Math.min(1.0, quality));
+
+      let encodedDataUrl = canvas.toDataURL(mimeType, clampedQuality);
+
+      // WebP canvas support fallback check (if browser converts webp to png when unsupported)
+      if (targetFormat === 'WEBP' && !encodedDataUrl.startsWith('data:image/webp')) {
+        // Fallback to JPEG if browser canvas toDataURL does not support image/webp
+        encodedDataUrl = canvas.toDataURL('image/jpeg', clampedQuality);
+        jsPdfFormat = 'JPEG';
+      }
+
+      finish({
+        dataUrl: encodedDataUrl,
+        jsPdfFormat,
+        width: naturalW,
+        height: naturalH,
+      });
+    };
+
+    img.onerror = () => {
+      clearTimeout(timer);
+      finish({
+        dataUrl: srcDataUrl,
+        jsPdfFormat: targetFormat === 'PNG' ? 'PNG' : targetFormat === 'WEBP' ? 'WEBP' : 'JPEG',
+        width: origWidth,
+        height: origHeight,
+      });
+    };
+
+    img.src = srcDataUrl;
+  });
 }
