@@ -1,7 +1,7 @@
 import type { OptimizationOptions } from '../types';
 
-export const DEFAULT_MAX_DIMENSION = 2400; // Crisp HD resolution, preserves text sharpness
-export const DEFAULT_QUALITY = 0.82; // Optimal JPEG visual balance
+export const DEFAULT_MAX_DIMENSION = 4096; // Avoid aggressive downscaling while preventing upscaling
+export const DEFAULT_QUALITY = 0.93; // High quality JPEG compression (0.92–0.95) for sharp text and fine details
 
 /**
  * Calculates new width and height respecting max dimension and maintaining aspect ratio.

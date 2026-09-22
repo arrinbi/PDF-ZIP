@@ -1,30 +1,40 @@
 import { describe, it, expect } from 'vitest';
-import { calculateTargetDimensions, formatFileSize } from '../imageOptimizer';
+import { calculateTargetDimensions, formatFileSize, DEFAULT_MAX_DIMENSION, DEFAULT_QUALITY } from '../imageOptimizer';
 
 describe('imageOptimizer utilities', () => {
+  it('uses expected default quality and max dimension constants', () => {
+    expect(DEFAULT_QUALITY).toBe(0.93);
+    expect(DEFAULT_MAX_DIMENSION).toBe(4096);
+  });
+
   describe('calculateTargetDimensions', () => {
     it('returns exact dimensions if image is smaller than max dimension', () => {
-      const result = calculateTargetDimensions(800, 600, 2400);
+      const result = calculateTargetDimensions(800, 600, 4096);
       expect(result).toEqual({ width: 800, height: 600 });
     });
 
+    it('does not upscale smaller images', () => {
+      const result = calculateTargetDimensions(1920, 1080);
+      expect(result).toEqual({ width: 1920, height: 1080 });
+    });
+
     it('scales down landscape images exceeding max dimension while preserving aspect ratio', () => {
-      const result = calculateTargetDimensions(4800, 2400, 2400);
-      expect(result).toEqual({ width: 2400, height: 1200 });
+      const result = calculateTargetDimensions(8192, 4096, 4096);
+      expect(result).toEqual({ width: 4096, height: 2048 });
     });
 
     it('scales down portrait images exceeding max dimension while preserving aspect ratio', () => {
-      const result = calculateTargetDimensions(3000, 4000, 2000);
-      expect(result).toEqual({ width: 1500, height: 2000 });
+      const result = calculateTargetDimensions(3000, 6000, 4000);
+      expect(result).toEqual({ width: 2000, height: 4000 });
     });
 
     it('handles square images accurately', () => {
-      const result = calculateTargetDimensions(3000, 3000, 1500);
-      expect(result).toEqual({ width: 1500, height: 1500 });
+      const result = calculateTargetDimensions(5000, 5000, 2500);
+      expect(result).toEqual({ width: 2500, height: 2500 });
     });
 
     it('handles zero or invalid dimensions gracefully', () => {
-      expect(calculateTargetDimensions(0, 0, 2400)).toEqual({ width: 1, height: 1 });
+      expect(calculateTargetDimensions(0, 0, 4096)).toEqual({ width: 1, height: 1 });
     });
   });
 

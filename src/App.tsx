@@ -14,7 +14,7 @@ import { FileText, Sparkles, Sliders, Info } from 'lucide-react';
 
 export const App: React.FC = () => {
   const [images, setImages] = useState<ImageItem[]>([]);
-  const [pageSize, setPageSize] = useState<'fit' | 'a4' | 'letter'>('fit');
+  const pageSize = 'a4';
   const [margin, setMargin] = useState<number>(0);
   const [pdfFilename, setPdfFilename] = useState<string>('converted_images');
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
@@ -248,31 +248,27 @@ export const App: React.FC = () => {
                   </label>
                   <select
                     value={pageSize}
-                    onChange={(e) => setPageSize(e.target.value as any)}
-                    className="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-xs bg-white focus:ring-2 focus:ring-indigo-500 outline-hidden"
+                    disabled
+                    className="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-xs bg-slate-100 text-slate-600 cursor-not-allowed outline-hidden"
                   >
-                    <option value="fit">Auto Fit (Match Image Dimensions)</option>
-                    <option value="a4">Standard A4 Page</option>
-                    <option value="letter">US Letter Page</option>
+                    <option value="a4">Standard A4 Portrait</option>
                   </select>
                 </div>
 
-                {pageSize !== 'fit' && (
-                  <div>
-                    <label className="block text-xs font-medium text-slate-600 mb-1">
-                      Page Margin
-                    </label>
-                    <select
-                      value={margin}
-                      onChange={(e) => setMargin(Number(e.target.value))}
-                      className="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-xs bg-white focus:ring-2 focus:ring-indigo-500 outline-hidden"
-                    >
-                      <option value={0}>No Margin (Full Bleed)</option>
-                      <option value={5}>Small (5mm)</option>
-                      <option value={10}>Standard (10mm)</option>
-                    </select>
-                  </div>
-                )}
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">
+                    Page Margin
+                  </label>
+                  <select
+                    value={margin}
+                    onChange={(e) => setMargin(Number(e.target.value))}
+                    className="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-xs bg-white focus:ring-2 focus:ring-indigo-500 outline-hidden"
+                  >
+                    <option value={0}>No Margin (Full Bleed)</option>
+                    <option value={5}>Small (5mm)</option>
+                    <option value={10}>Standard (10mm)</option>
+                  </select>
+                </div>
               </div>
             </div>
 
