@@ -1,7 +1,7 @@
 import type { OptimizationOptions } from '../types';
 
 export const DEFAULT_MAX_DIMENSION = 8192; // Avoid unnecessary downscaling while preventing canvas overflow and upscaling
-export const DEFAULT_QUALITY = 0.98; // Very high quality JPEG compression for maximum visual clarity, sharp text, and fine line art
+export const DEFAULT_QUALITY = 0.85; // Balanced JPEG compression (85%) for clear line art and text readability while optimizing PDF file size
 
 /**
  * Calculates new width and height respecting max dimension and maintaining aspect ratio.

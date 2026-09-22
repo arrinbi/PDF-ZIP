@@ -3,7 +3,7 @@ import { calculateTargetDimensions, formatFileSize, DEFAULT_MAX_DIMENSION, DEFAU
 
 describe('imageOptimizer utilities', () => {
   it('uses expected default quality and max dimension constants', () => {
-    expect(DEFAULT_QUALITY).toBe(0.98);
+    expect(DEFAULT_QUALITY).toBe(0.85);
     expect(DEFAULT_MAX_DIMENSION).toBe(8192);
   });
 
