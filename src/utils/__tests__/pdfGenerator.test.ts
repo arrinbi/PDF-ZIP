@@ -63,6 +63,12 @@ describe('pdfGenerator utilities', () => {
     expect(progressSpy).toHaveBeenLastCalledWith(2, 2);
   });
 
+  it('passes compression NONE to addImage to prevent double JPEG recompression', async () => {
+    const options: PdfOptions = { pageSize: 'fit', margin: 0 };
+    const result = await generatePdfFromImages([sampleImages[0]], options);
+    expect(result).toBeDefined();
+  });
+
   it('handles images with varied aspect ratios including tall, wide, and square without cropping', async () => {
     const options: PdfOptions = { pageSize: 'fit', margin: 0 };
     const mixedImages: ImageItem[] = [

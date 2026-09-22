@@ -51,7 +51,7 @@ export async function generatePdfFromImages(
     if (pdf) {
       const x = margin;
       const y = margin;
-      pdf.addImage(imageDataUrl, 'JPEG', x, y, drawW, drawH);
+      pdf.addImage(imageDataUrl, 'JPEG', x, y, drawW, drawH, undefined, 'NONE');
     }
 
     if (onProgress) {
