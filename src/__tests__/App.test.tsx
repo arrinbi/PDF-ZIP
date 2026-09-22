@@ -9,9 +9,9 @@ if (typeof window !== 'undefined') {
 
 describe('App Component', () => {
   beforeEach(() => {
-    vi.spyOn(imageOptimizer, 'readImageData').mockImplementation(async (file: File) => {
+    vi.spyOn(imageOptimizer, 'readImageData').mockImplementation(async () => {
       return {
-        previewUrl: `data:${file.type};base64,fake-preview-data`,
+        previewUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
         width: 800,
         height: 600,
       };
@@ -83,5 +83,45 @@ describe('App Component', () => {
       expect(screen.getByText(/Your ZIP Archive is Ready!/i)).toBeDefined();
       expect(screen.getByText(/Download ZIP/i)).toBeDefined();
     });
+  });
+
+  it('opens PDF preview in browser when "Preview in Browser" button is clicked', async () => {
+    const mockWrite = vi.fn();
+    const mockClose = vi.fn();
+    const mockWindowOpen = vi.spyOn(window, 'open').mockReturnValue({
+      document: {
+        write: mockWrite,
+        close: mockClose,
+      },
+    } as unknown as Window);
+
+    render(<App />);
+
+    const file1 = new File(['fake data 1'], 'img1.png', { type: 'image/png' });
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+
+    if (input) {
+      fireEvent.change(input, { target: { files: [file1] } });
+    }
+
+    await waitFor(() => {
+      expect(screen.getByText(/Create PDF \(1\)/i)).toBeDefined();
+    });
+
+    const exportButton = screen.getByText(/Create PDF \(1\)/i);
+    fireEvent.click(exportButton);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Your PDF is Ready!/i)).toBeDefined();
+      expect(screen.getByText(/Preview in Browser/i)).toBeDefined();
+    });
+
+    const previewButton = screen.getByRole('button', { name: /Preview in Browser/i });
+    fireEvent.click(previewButton);
+
+    expect(mockWindowOpen).toHaveBeenCalledWith('', '_blank');
+    expect(mockWrite).toHaveBeenCalled();
+    expect(mockWrite.mock.calls[0][0]).toContain('iframe');
+    expect(mockClose).toHaveBeenCalled();
   });
 });
