@@ -46,22 +46,14 @@ export async function generatePdfFromImages(
       const availHeight = pageHeight - margin * 2;
 
       const imgAspect = imgWidthPx / imgHeightPx;
-      const availAspect = availWidth / availHeight;
 
-      let drawW = availWidth;
-      let drawH = availHeight;
+      // Fit to Width behavior: image width always fills full usable width
+      const drawW = availWidth;
+      const drawH = drawW / imgAspect;
 
-      if (imgAspect > availAspect) {
-        // Fit to width
-        drawH = availWidth / imgAspect;
-      } else {
-        // Fit to height
-        drawW = availHeight * imgAspect;
-      }
-
-      // Center image on A4 page
-      const x = margin + (availWidth - drawW) / 2;
-      const y = margin + (availHeight - drawH) / 2;
+      const x = margin;
+      // Center vertically if image is shorter than usable page height; align to top if taller
+      const y = margin + Math.max(0, (availHeight - drawH) / 2);
 
       pdf.addImage(imageDataUrl, 'JPEG', x, y, drawW, drawH);
     }

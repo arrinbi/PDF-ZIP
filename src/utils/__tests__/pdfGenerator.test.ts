@@ -62,4 +62,29 @@ describe('pdfGenerator utilities', () => {
     expect(progressSpy).toHaveBeenCalledTimes(2);
     expect(progressSpy).toHaveBeenLastCalledWith(2, 2);
   });
+
+  it('calculates image width to fill full usable A4 width without horizontal downscaling for tall images', async () => {
+    const options: PdfOptions = { pageSize: 'a4', margin: 0 };
+    // Image with aspect ratio 1:3 (tall manhwa page e.g. 1000 x 3000)
+    const tallImage: ImageItem[] = [
+      {
+        id: 'img-tall',
+        file: new File([], 'tall.jpg', { type: 'image/jpeg' }),
+        name: 'tall.jpg',
+        size: 5000,
+        type: 'image/jpeg',
+        previewUrl: dummyDataUrl,
+        width: 1000,
+        height: 3000,
+        optimizedDataUrl: dummyDataUrl,
+        optimizedWidth: 1000,
+        optimizedHeight: 3000,
+        optimizedSize: 5000,
+      },
+    ];
+
+    const result = await generatePdfFromImages(tallImage, options);
+    expect(result).toBeDefined();
+    expect(result.pageCount).toBe(1);
+  });
 });

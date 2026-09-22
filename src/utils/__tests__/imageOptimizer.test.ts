@@ -3,13 +3,13 @@ import { calculateTargetDimensions, formatFileSize, DEFAULT_MAX_DIMENSION, DEFAU
 
 describe('imageOptimizer utilities', () => {
   it('uses expected default quality and max dimension constants', () => {
-    expect(DEFAULT_QUALITY).toBe(0.93);
-    expect(DEFAULT_MAX_DIMENSION).toBe(4096);
+    expect(DEFAULT_QUALITY).toBe(0.98);
+    expect(DEFAULT_MAX_DIMENSION).toBe(8192);
   });
 
   describe('calculateTargetDimensions', () => {
     it('returns exact dimensions if image is smaller than max dimension', () => {
-      const result = calculateTargetDimensions(800, 600, 4096);
+      const result = calculateTargetDimensions(800, 600, 8192);
       expect(result).toEqual({ width: 800, height: 600 });
     });
 
@@ -19,8 +19,8 @@ describe('imageOptimizer utilities', () => {
     });
 
     it('scales down landscape images exceeding max dimension while preserving aspect ratio', () => {
-      const result = calculateTargetDimensions(8192, 4096, 4096);
-      expect(result).toEqual({ width: 4096, height: 2048 });
+      const result = calculateTargetDimensions(16384, 8192, 8192);
+      expect(result).toEqual({ width: 8192, height: 4096 });
     });
 
     it('scales down portrait images exceeding max dimension while preserving aspect ratio', () => {
