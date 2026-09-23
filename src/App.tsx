@@ -4,6 +4,7 @@ import { ImageUploader } from './components/ImageUploader';
 import { ImageList } from './components/ImageList';
 import { ProgressBar } from './components/ProgressBar';
 import { PdfPreview } from './components/PdfPreview';
+import { BatchProcessing } from './components/BatchProcessing';
 import type {
   ExportMode,
   ExportResult,
@@ -19,6 +20,7 @@ import { generateZipFromImages } from './utils/zipGenerator';
 import { FileText, Sparkles, Sliders, Info, Image as ImageIcon, Archive } from 'lucide-react';
 
 export const App: React.FC = () => {
+  const [activeTab, setActiveTab] = useState<'single' | 'batch'>('single');
   const [images, setImages] = useState<ImageItem[]>([]);
   const [exportMode, setExportMode] = useState<ExportMode>('pdf');
   const pageSize = 'fit';
@@ -165,9 +167,13 @@ export const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
-      <Header />
+      <Header activeTab={activeTab} onTabChange={setActiveTab} />
 
       <main className="flex-1 max-w-4xl w-full mx-auto px-4 py-6 sm:py-8 space-y-6">
+        {activeTab === 'batch' ? (
+          <BatchProcessing />
+        ) : (
+          <>
         {errorMessage && (
           <div className="bg-red-50 border border-red-200 text-red-700 text-sm p-4 rounded-xl flex items-center justify-between">
             <span>{errorMessage}</span>
@@ -520,6 +526,8 @@ export const App: React.FC = () => {
               onClearAll={handleClearAll}
             />
           </div>
+        )}
+          </>
         )}
       </main>
     </div>
