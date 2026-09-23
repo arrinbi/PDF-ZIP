@@ -1,5 +1,5 @@
 import React from 'react';
-import { Download, CheckCircle2, FileCheck, ArrowLeft, Archive } from 'lucide-react';
+import { Download, CheckCircle2, ArrowLeft, Archive } from 'lucide-react';
 import type { ExportResult, GeneratedPdfResult, GeneratedZipResult } from '../types';
 import { formatFileSize } from '../utils/imageOptimizer';
 
@@ -51,25 +51,6 @@ export const PdfPreview: React.FC<PdfPreviewProps> = ({
     count = pdfResult.pageCount;
   }
 
-  const handlePreview = () => {
-    if (!url) return;
-    const win = window.open('', '_blank');
-    if (win) {
-      win.document.title = filename || 'PDF Preview';
-      win.document.body.style.margin = '0';
-      win.document.body.style.padding = '0';
-      win.document.body.style.overflow = 'hidden';
-      win.document.body.style.height = '100vh';
-
-      const iframe = win.document.createElement('iframe');
-      iframe.src = url;
-      iframe.style.width = '100%';
-      iframe.style.height = '100%';
-      iframe.style.border = 'none';
-      win.document.body.appendChild(iframe);
-    }
-  };
-
   return (
     <div className="bg-white border border-slate-200 rounded-2xl p-6 sm:p-8 shadow-md max-w-xl mx-auto space-y-6 text-center animate-fade-in">
       <div className="w-16 h-16 mx-auto rounded-2xl bg-emerald-100 text-emerald-600 flex items-center justify-center">
@@ -119,7 +100,7 @@ export const PdfPreview: React.FC<PdfPreviewProps> = ({
           <span>Download {isZip ? 'ZIP' : 'PDF'} ({formatFileSize(sizeBytes)})</span>
         </a>
 
-        <div className={`flex items-center ${isZip ? 'justify-center sm:justify-between' : 'justify-between'} pt-2`}>
+        <div className="flex items-center justify-center pt-2">
           <button
             onClick={onReset}
             className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-600 hover:text-slate-900 py-2 px-3 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
@@ -127,17 +108,6 @@ export const PdfPreview: React.FC<PdfPreviewProps> = ({
             <ArrowLeft className="w-4 h-4" />
             <span>{isZip ? 'Create Another Export' : 'Create Another PDF'}</span>
           </button>
-
-          {!isZip && (
-            <button
-              type="button"
-              onClick={handlePreview}
-              className="inline-flex items-center gap-1.5 text-xs font-medium text-indigo-600 hover:text-indigo-700 py-2 px-3 rounded-lg hover:bg-indigo-50 transition-colors cursor-pointer"
-            >
-              <FileCheck className="w-4 h-4" />
-              <span>Preview in Browser</span>
-            </button>
-          )}
         </div>
       </div>
     </div>
