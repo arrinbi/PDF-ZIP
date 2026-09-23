@@ -106,21 +106,31 @@ export async function processImageForPdf(
 
   // Handle PNG:
   // For PNG output:
-  // - Do not apply JPEG-style lossy compression.
-  // - Preserve PNG image quality.
-  // - If source is already PNG, return original dataUrl directly without re-encoding to preserve exact quality.
-  if (targetFormat === 'PNG') {
-    if (srcType.includes('png')) {
-      return {
-        dataUrl: srcDataUrl,
-        jsPdfFormat: 'PNG',
-        width: origWidth,
-        height: origHeight,
-      };
-    }
+  // - Keep PNG as PNG and lossless.
+  // - If source is already PNG, return original dataUrl directly without re-encoding to preserve exact quality and avoid overhead.
+  if (targetFormat === 'PNG' && srcType.includes('png')) {
+    return {
+      dataUrl: srcDataUrl,
+      jsPdfFormat: 'PNG',
+      width: origWidth,
+      height: origHeight,
+    };
   }
 
-  // For canvas processing (JPG, WEBP, or PNG from non-PNG source):
+  // Handle WEBP:
+  // For WEBP output:
+  // - Keep WEBP as WEBP.
+  // - If source is already WEBP, return original dataUrl directly without re-encoding to avoid double-encoding overhead.
+  if (targetFormat === 'WEBP' && srcType.includes('webp')) {
+    return {
+      dataUrl: srcDataUrl,
+      jsPdfFormat: 'WEBP',
+      width: origWidth,
+      height: origHeight,
+    };
+  }
+
+  // For canvas processing (JPG, or format conversion):
   return new Promise((resolve) => {
     // In node/jsdom test environments without full canvas/Image rendering engine, HTMLImageElement onload may not fire for inline base64 images.
     // If document/window canvas context is not present or in test mock environment, return source/fallback directly.
