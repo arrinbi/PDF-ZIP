@@ -162,5 +162,98 @@ describe('zipGenerator utilities', () => {
       const content01 = await zip.files['01.webp'].async('string');
       expect(content01).toBe('file3');
     });
+
+    it('creates a ZIP archive with JPG converted files when outputFormat is JPG', async () => {
+      const samplePng = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+      const sampleWebp = 'data:image/webp;base64,UklGRiQAAABXRUJQVlA4IBgAAAAwAQCdASoBAAEAAQAcJaQAA3AA/v3AgAA=';
+
+      const images: ImageItem[] = [
+        {
+          id: '1',
+          file: new File([], 'img1.png', { type: 'image/png' }),
+          name: 'img1.png',
+          size: 100,
+          type: 'image/png',
+          previewUrl: samplePng,
+          width: 100,
+          height: 100,
+        },
+        {
+          id: '2',
+          file: new File([], 'img2.webp', { type: 'image/webp' }),
+          name: 'img2.webp',
+          size: 100,
+          type: 'image/webp',
+          previewUrl: sampleWebp,
+          width: 200,
+          height: 200,
+        },
+      ];
+
+      const result = await generateZipFromImages(images, { outputFormat: 'JPG', quality: 0.85 });
+      expect(result.fileCount).toBe(2);
+
+      const zip = await JSZip.loadAsync(result.blob);
+      const zipFiles = Object.keys(zip.files);
+      expect(zipFiles).toEqual(['01.jpg', '02.jpg']);
+    });
+
+    it('creates a ZIP archive with PNG converted files when outputFormat is PNG', async () => {
+      const sampleJpeg = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=';
+
+      const images: ImageItem[] = [
+        {
+          id: '1',
+          file: new File([], 'photo1.jpg', { type: 'image/jpeg' }),
+          name: 'photo1.jpg',
+          size: 100,
+          type: 'image/jpeg',
+          previewUrl: sampleJpeg,
+          width: 100,
+          height: 100,
+        },
+        {
+          id: '2',
+          file: new File([], 'photo2.jpg', { type: 'image/jpeg' }),
+          name: 'photo2.jpg',
+          size: 100,
+          type: 'image/jpeg',
+          previewUrl: sampleJpeg,
+          width: 200,
+          height: 200,
+        },
+      ];
+
+      const result = await generateZipFromImages(images, { outputFormat: 'PNG' });
+      expect(result.fileCount).toBe(2);
+
+      const zip = await JSZip.loadAsync(result.blob);
+      const zipFiles = Object.keys(zip.files);
+      expect(zipFiles).toEqual(['01.png', '02.png']);
+    });
+
+    it('creates a ZIP archive with WEBP converted files when outputFormat is WEBP', async () => {
+      const samplePng = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+
+      const images: ImageItem[] = [
+        {
+          id: '1',
+          file: new File([], 'test1.png', { type: 'image/png' }),
+          name: 'test1.png',
+          size: 100,
+          type: 'image/png',
+          previewUrl: samplePng,
+          width: 100,
+          height: 100,
+        },
+      ];
+
+      const result = await generateZipFromImages(images, { outputFormat: 'WEBP', quality: 0.90 });
+      expect(result.fileCount).toBe(1);
+
+      const zip = await JSZip.loadAsync(result.blob);
+      const zipFiles = Object.keys(zip.files);
+      expect(zipFiles).toEqual(['01.webp']);
+    });
   });
 });

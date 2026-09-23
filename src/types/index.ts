@@ -21,6 +21,8 @@ export interface OptimizationOptions {
 
 export type OutputFormat = 'JPG' | 'PNG' | 'WEBP';
 
+export type ZipOutputFormat = 'ORIGINAL' | 'JPG' | 'PNG' | 'WEBP';
+
 export type ExportMode = 'pdf' | 'zip';
 
 export interface PdfOptions {
@@ -33,6 +35,8 @@ export interface PdfOptions {
 
 export interface ZipOptions {
   filename?: string;
+  outputFormat?: ZipOutputFormat;
+  quality?: number; // 0.80 to 1.00, default 0.85
 }
 
 export interface ProcessingProgress {
