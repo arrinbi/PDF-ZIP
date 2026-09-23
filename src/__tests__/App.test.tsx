@@ -85,16 +85,7 @@ describe('App Component', () => {
     });
   });
 
-  it('opens PDF preview in browser when "Preview in Browser" button is clicked', async () => {
-    const mockWrite = vi.fn();
-    const mockClose = vi.fn();
-    const mockWindowOpen = vi.spyOn(window, 'open').mockReturnValue({
-      document: {
-        write: mockWrite,
-        close: mockClose,
-      },
-    } as unknown as Window);
-
+  it('opens PDF preview in browser when "Preview in Browser" link is clicked', async () => {
     render(<App />);
 
     const file1 = new File(['fake data 1'], 'img1.png', { type: 'image/png' });
@@ -116,12 +107,10 @@ describe('App Component', () => {
       expect(screen.getByText(/Preview in Browser/i)).toBeDefined();
     });
 
-    const previewButton = screen.getByRole('button', { name: /Preview in Browser/i });
-    fireEvent.click(previewButton);
-
-    expect(mockWindowOpen).toHaveBeenCalledWith('', '_blank');
-    expect(mockWrite).toHaveBeenCalled();
-    expect(mockWrite.mock.calls[0][0]).toContain('iframe');
-    expect(mockClose).toHaveBeenCalled();
+    const previewLink = screen.getByRole('link', { name: /Preview in Browser/i });
+    expect(previewLink.getAttribute('href')).toBe('blob:mock-export-url');
+    expect(previewLink.getAttribute('target')).toBe('_blank');
+    expect(previewLink.getAttribute('rel')).toBe('noopener noreferrer');
+    expect(previewLink.getAttribute('download')).toBeNull();
   });
 });
