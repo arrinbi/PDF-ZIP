@@ -46,16 +46,43 @@ export function readImageData(file: File): Promise<{ previewUrl: string; width: 
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = (e) => {
-      const dataUrl = e.target?.result as string;
+      const dataUrl = (e.target?.result as string) || '';
       const img = new Image();
+      let settled = false;
+
+      const timer = setTimeout(() => {
+        if (!settled) {
+          settled = true;
+          resolve({
+            previewUrl: dataUrl,
+            width: 1000,
+            height: 1000,
+          });
+        }
+      }, 200);
+
       img.onload = () => {
-        resolve({
-          previewUrl: dataUrl,
-          width: img.naturalWidth || img.width,
-          height: img.naturalHeight || img.height,
-        });
+        if (!settled) {
+          settled = true;
+          clearTimeout(timer);
+          resolve({
+            previewUrl: dataUrl,
+            width: img.naturalWidth || img.width || 1000,
+            height: img.naturalHeight || img.height || 1000,
+          });
+        }
       };
-      img.onerror = () => reject(new Error('Failed to load image structure.'));
+      img.onerror = () => {
+        if (!settled) {
+          settled = true;
+          clearTimeout(timer);
+          resolve({
+            previewUrl: dataUrl,
+            width: 1000,
+            height: 1000,
+          });
+        }
+      };
       img.src = dataUrl;
     };
     reader.onerror = () => reject(new Error('Failed to read file.'));

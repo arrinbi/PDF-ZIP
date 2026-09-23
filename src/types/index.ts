@@ -65,3 +65,14 @@ export interface GeneratedZipResult {
 export type ExportResult =
   | { mode: 'pdf'; pdf: GeneratedPdfResult }
   | { mode: 'zip'; zip: GeneratedZipResult };
+
+export interface BatchFolder {
+  id: string;
+  folderName: string;
+  images: ImageItem[];
+}
+
+export interface BatchResult {
+  folderName: string;
+  result: ExportResult;
+}
