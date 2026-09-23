@@ -65,7 +65,7 @@ export async function generateZipFromImages(
       // Add exact original File byte-for-byte to ZIP archive
       zip.file(filename, item.file);
     } else {
-      const targetFormat: OutputFormat = outputFormat;
+      const targetFormat: OutputFormat | 'WEBP' = outputFormat;
       const ext = targetFormat === 'JPG' ? '.jpg' : targetFormat === 'PNG' ? '.png' : '.webp';
       const filename = formatNumberedFilename(i, ext);
 

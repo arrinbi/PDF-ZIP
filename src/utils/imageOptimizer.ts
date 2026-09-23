@@ -89,7 +89,7 @@ export async function optimizeSingleImage(
  */
 export async function processImageForPdf(
   item: ImageItem,
-  targetFormat: OutputFormat = 'JPG',
+  targetFormat: OutputFormat | 'WEBP' = 'JPG',
   quality: number = DEFAULT_QUALITY
 ): Promise<{ dataUrl: string; jsPdfFormat: string; width: number; height: number }> {
   const srcDataUrl = item.previewUrl || item.optimizedDataUrl || '';
@@ -117,25 +117,12 @@ export async function processImageForPdf(
     };
   }
 
-  // Handle WEBP:
-  // For WEBP output:
-  // - Keep WEBP as WEBP.
-  // - If source is already WEBP, return original dataUrl directly without re-encoding to avoid double-encoding overhead.
-  if (targetFormat === 'WEBP' && srcType.includes('webp')) {
-    return {
-      dataUrl: srcDataUrl,
-      jsPdfFormat: 'WEBP',
-      width: origWidth,
-      height: origHeight,
-    };
-  }
-
-  // For canvas processing (JPG, or format conversion):
+  // For canvas processing (JPG, or PNG conversion from non-PNG inputs):
   return new Promise((resolve) => {
     // In node/jsdom test environments without full canvas/Image rendering engine, HTMLImageElement onload may not fire for inline base64 images.
     // If document/window canvas context is not present or in test mock environment, return source/fallback directly.
     if (typeof document === 'undefined' || typeof HTMLCanvasElement === 'undefined') {
-      const fallbackFormat = targetFormat === 'PNG' ? 'PNG' : targetFormat === 'WEBP' ? 'WEBP' : 'JPEG';
+      const fallbackFormat = targetFormat === 'PNG' ? 'PNG' : 'JPEG';
       resolve({
         dataUrl: srcDataUrl,
         jsPdfFormat: fallbackFormat,
@@ -158,7 +145,7 @@ export async function processImageForPdf(
 
     // Timeout safety for environments where Image onload does not trigger
     const timer = setTimeout(() => {
-      const jsPdfFormat = targetFormat === 'PNG' ? 'PNG' : targetFormat === 'WEBP' ? 'WEBP' : 'JPEG';
+      const jsPdfFormat = targetFormat === 'PNG' ? 'PNG' : 'JPEG';
       finish({
         dataUrl: srcDataUrl,
         jsPdfFormat,
@@ -180,7 +167,7 @@ export async function processImageForPdf(
       if (!ctx) {
         finish({
           dataUrl: srcDataUrl,
-          jsPdfFormat: targetFormat === 'PNG' ? 'PNG' : targetFormat === 'WEBP' ? 'WEBP' : 'JPEG',
+          jsPdfFormat: targetFormat === 'PNG' ? 'PNG' : 'JPEG',
           width: naturalW,
           height: naturalH,
         });
@@ -212,14 +199,7 @@ export async function processImageForPdf(
       // Clamp quality value between 0.8 and 1.0
       const clampedQuality = Math.max(0.8, Math.min(1.0, quality));
 
-      let encodedDataUrl = canvas.toDataURL(mimeType, clampedQuality);
-
-      // WebP canvas support fallback check (if browser converts webp to png when unsupported)
-      if (targetFormat === 'WEBP' && !encodedDataUrl.startsWith('data:image/webp')) {
-        // Fallback to JPEG if browser canvas toDataURL does not support image/webp
-        encodedDataUrl = canvas.toDataURL('image/jpeg', clampedQuality);
-        jsPdfFormat = 'JPEG';
-      }
+      const encodedDataUrl = canvas.toDataURL(mimeType, clampedQuality);
 
       finish({
         dataUrl: encodedDataUrl,
@@ -233,7 +213,7 @@ export async function processImageForPdf(
       clearTimeout(timer);
       finish({
         dataUrl: srcDataUrl,
-        jsPdfFormat: targetFormat === 'PNG' ? 'PNG' : targetFormat === 'WEBP' ? 'WEBP' : 'JPEG',
+        jsPdfFormat: targetFormat === 'PNG' ? 'PNG' : 'JPEG',
         width: origWidth,
         height: origHeight,
       });
