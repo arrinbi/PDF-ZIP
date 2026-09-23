@@ -347,8 +347,8 @@ export const App: React.FC = () => {
                         <label className="block text-xs font-medium text-slate-600 mb-1">
                           Output Format
                         </label>
-                        <div className="grid grid-cols-3 gap-2">
-                          {(['JPG', 'PNG', 'WEBP'] as OutputFormat[]).map((fmt) => (
+                        <div className="grid grid-cols-2 gap-2">
+                          {(['JPG', 'PNG'] as OutputFormat[]).map((fmt) => (
                             <button
                               key={fmt}
                               type="button"

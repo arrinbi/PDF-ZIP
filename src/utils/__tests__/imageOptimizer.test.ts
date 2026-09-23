@@ -108,12 +108,5 @@ describe('imageOptimizer utilities', () => {
       expect(result.width).toBe(100);
       expect(result.height).toBe(100);
     });
-
-    it('processes image for WEBP output format', async () => {
-      const result = await processImageForPdf(pngItem, 'WEBP', 0.85);
-      expect(['WEBP', 'JPEG']).toContain(result.jsPdfFormat);
-      expect(result.width).toBe(100);
-      expect(result.height).toBe(100);
-    });
   });
 });

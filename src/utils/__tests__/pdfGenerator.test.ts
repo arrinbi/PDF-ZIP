@@ -81,17 +81,6 @@ describe('pdfGenerator utilities', () => {
       const resultJpg = await generatePdfFromImages(sampleImages, optionsJpg);
       expect(resultJpg).toBeDefined();
       expect(resultJpg.pageCount).toBe(2);
-
-      const optionsWebp: PdfOptions = {
-        pageSize: 'fit',
-        margin: 0,
-        filename: `doc_webp_${q}`,
-        outputFormat: 'WEBP',
-        quality: q,
-      };
-      const resultWebp = await generatePdfFromImages(sampleImages, optionsWebp);
-      expect(resultWebp).toBeDefined();
-      expect(resultWebp.pageCount).toBe(2);
     }
   });
 

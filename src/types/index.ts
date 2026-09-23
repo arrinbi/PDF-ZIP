@@ -19,7 +19,7 @@ export interface OptimizationOptions {
   quality?: number; // 0.1 to 1.0, default 0.82
 }
 
-export type OutputFormat = 'JPG' | 'PNG' | 'WEBP';
+export type OutputFormat = 'JPG' | 'PNG';
 
 export type ZipOutputFormat = 'ORIGINAL' | 'JPG' | 'PNG' | 'WEBP';
 
