@@ -55,6 +55,52 @@ describe('App Component', () => {
     // Verify PDF-only options are hidden in ZIP mode
     expect(screen.queryByText(/Page Margin/i)).toBeNull();
     expect(screen.queryByText(/Image Output & Compression/i)).toBeNull();
+
+    // Verify ZIP Format options exist
+    expect(screen.getByText(/ZIP Format & Quality/i)).toBeDefined();
+    expect(screen.getByRole('button', { name: 'Original' })).toBeDefined();
+    expect(screen.getByRole('button', { name: 'JPG' })).toBeDefined();
+    expect(screen.getByRole('button', { name: 'PNG' })).toBeDefined();
+    expect(screen.getByRole('button', { name: 'WEBP' })).toBeDefined();
+  });
+
+  it('allows switching ZIP format options and disables quality for Original/PNG', async () => {
+    render(<App />);
+
+    const file1 = new File(['fake image data 1'], 'photo123.jpg', { type: 'image/jpeg' });
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+
+    if (input) {
+      fireEvent.change(input, { target: { files: [file1] } });
+    }
+
+    await waitFor(() => {
+      expect(screen.getByText(/Export Options/i)).toBeDefined();
+    });
+
+    // Switch to ZIP export mode
+    const zipModeButton = screen.getByRole('button', { name: /ZIP/i });
+    fireEvent.click(zipModeButton);
+
+    const qualityRange = screen.getByRole('slider') as HTMLInputElement;
+
+    // Default ZIP mode is Original -> quality slider disabled
+    expect(qualityRange.disabled).toBe(true);
+
+    // Click JPG format
+    const jpgBtn = screen.getByRole('button', { name: 'JPG' });
+    fireEvent.click(jpgBtn);
+    expect(qualityRange.disabled).toBe(false);
+
+    // Click PNG format
+    const pngBtn = screen.getByRole('button', { name: 'PNG' });
+    fireEvent.click(pngBtn);
+    expect(qualityRange.disabled).toBe(true);
+
+    // Click WEBP format
+    const webpBtn = screen.getByRole('button', { name: 'WEBP' });
+    fireEvent.click(webpBtn);
+    expect(qualityRange.disabled).toBe(false);
   });
 
   it('generates ZIP export when in ZIP mode and export button is clicked', async () => {

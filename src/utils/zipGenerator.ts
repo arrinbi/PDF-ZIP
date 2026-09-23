@@ -1,5 +1,6 @@
 import JSZip from 'jszip';
-import type { GeneratedZipResult, ImageItem, ZipOptions } from '../types';
+import type { GeneratedZipResult, ImageItem, OutputFormat, ZipOptions } from '../types';
+import { processImageForPdf, DEFAULT_QUALITY } from './imageOptimizer';
 
 /**
  * Extracts extension from filename or infers it from MIME type.
@@ -36,9 +37,9 @@ export function formatNumberedFilename(index: number, extension: string): string
 }
 
 /**
- * Generates a ZIP archive containing the exact original uploaded images,
- * renamed by their current display order in two-digit zero-padded format.
- * No re-encoding, compression, or format conversion is applied.
+ * Generates a ZIP archive containing the uploaded images renamed by their current
+ * display order in two-digit zero-padded format.
+ * Supports ORIGINAL (byte-for-byte), JPG, PNG, and WEBP formats.
  */
 export async function generateZipFromImages(
   images: ImageItem[],
@@ -51,14 +52,28 @@ export async function generateZipFromImages(
 
   const zip = new JSZip();
   const totalCount = images.length;
+  const outputFormat = options.outputFormat || 'ORIGINAL';
+  const quality = options.quality !== undefined ? options.quality : DEFAULT_QUALITY;
 
   for (let i = 0; i < totalCount; i++) {
     const item = images[i];
-    const ext = getFileExtension(item.file?.name || item.name, item.type);
-    const filename = formatNumberedFilename(i, ext);
 
-    // Add exact original File byte-for-byte to ZIP archive
-    zip.file(filename, item.file);
+    if (outputFormat === 'ORIGINAL') {
+      const ext = getFileExtension(item.file?.name || item.name, item.type);
+      const filename = formatNumberedFilename(i, ext);
+
+      // Add exact original File byte-for-byte to ZIP archive
+      zip.file(filename, item.file);
+    } else {
+      const targetFormat: OutputFormat = outputFormat;
+      const ext = targetFormat === 'JPG' ? '.jpg' : targetFormat === 'PNG' ? '.png' : '.webp';
+      const filename = formatNumberedFilename(i, ext);
+
+      const processed = await processImageForPdf(item, targetFormat, quality);
+      const base64Data = processed.dataUrl.split(',')[1] || '';
+
+      zip.file(filename, base64Data, { base64: true });
+    }
 
     if (onProgress) {
       onProgress(i + 1, totalCount);

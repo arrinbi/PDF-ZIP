@@ -11,6 +11,7 @@ import type {
   OutputFormat,
   PdfOptions,
   ProcessingProgress,
+  ZipOutputFormat,
 } from './types';
 import { readImageData } from './utils/imageOptimizer';
 import { generatePdfFromImages } from './utils/pdfGenerator';
@@ -23,6 +24,7 @@ export const App: React.FC = () => {
   const pageSize = 'fit';
   const [margin, setMargin] = useState<number>(0);
   const [outputFormat, setOutputFormat] = useState<OutputFormat>('JPG');
+  const [zipOutputFormat, setZipOutputFormat] = useState<ZipOutputFormat>('ORIGINAL');
   const [quality, setQuality] = useState<number>(0.85); // Default 85%
   const [pdfFilename, setPdfFilename] = useState<string>('converted_images');
   const [zipFilename, setZipFilename] = useState<string>('images');
@@ -128,7 +130,11 @@ export const App: React.FC = () => {
 
         const result = await generateZipFromImages(
           images,
-          { filename: zipFilename || 'images' },
+          {
+            filename: zipFilename || 'images',
+            outputFormat: zipOutputFormat,
+            quality: quality,
+          },
           (curr, tot) => {
             setProgress({
               stage: 'generating',
@@ -399,7 +405,7 @@ export const App: React.FC = () => {
                 </div>
               ) : (
                 /* ZIP Options */
-                <div className="space-y-3">
+                <div className="space-y-4">
                   <div className="max-w-xs">
                     <label className="block text-xs font-medium text-slate-600 mb-1">
                       ZIP Archive Name
@@ -413,11 +419,93 @@ export const App: React.FC = () => {
                     />
                   </div>
 
+                  <div className="border-t border-slate-100 pt-3">
+                    <div className="flex items-center gap-2 text-slate-800 font-semibold text-xs mb-3">
+                      <ImageIcon className="w-3.5 h-3.5 text-indigo-600" />
+                      <span>ZIP Format & Quality</span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {/* Format Selector */}
+                      <div>
+                        <label className="block text-xs font-medium text-slate-600 mb-1">
+                          ZIP Format
+                        </label>
+                        <div className="grid grid-cols-4 gap-2">
+                          {(['ORIGINAL', 'JPG', 'PNG', 'WEBP'] as ZipOutputFormat[]).map((fmt) => (
+                            <button
+                              key={fmt}
+                              type="button"
+                              onClick={() => setZipOutputFormat(fmt)}
+                              className={`py-1.5 px-2 text-xs font-medium rounded-lg border transition-all cursor-pointer text-center ${
+                                zipOutputFormat === fmt
+                                  ? 'bg-indigo-50 border-indigo-500 text-indigo-700 font-semibold shadow-xs'
+                                  : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                              }`}
+                            >
+                              {fmt === 'ORIGINAL' ? 'Original' : fmt}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Quality Slider */}
+                      <div>
+                        <div className="flex justify-between items-center mb-1">
+                          <label className="block text-xs font-medium text-slate-600">
+                            Image Quality
+                          </label>
+                          <span className="text-xs font-bold text-indigo-600">
+                            {Math.round(quality * 100)}%
+                          </span>
+                        </div>
+
+                        <input
+                          type="range"
+                          min="0.80"
+                          max="1.00"
+                          step="0.05"
+                          value={quality}
+                          onChange={(e) => setQuality(parseFloat(e.target.value))}
+                          disabled={zipOutputFormat === 'ORIGINAL' || zipOutputFormat === 'PNG'}
+                          className={`w-full accent-indigo-600 ${
+                            zipOutputFormat === 'ORIGINAL' || zipOutputFormat === 'PNG'
+                              ? 'opacity-50 cursor-not-allowed'
+                              : 'cursor-pointer'
+                          }`}
+                        />
+
+                        <div className="flex justify-between text-[10px] text-slate-400 mt-0.5">
+                          <span>80% (Smaller Size)</span>
+                          <span>100% (Best Quality)</span>
+                        </div>
+
+                        {(zipOutputFormat === 'ORIGINAL' || zipOutputFormat === 'PNG') && (
+                          <p className="text-[11px] text-indigo-600 mt-1">
+                            {zipOutputFormat === 'ORIGINAL'
+                              ? 'Original files will be archived byte-for-byte without recompressing.'
+                              : 'PNG uses lossless format. Original crispness is retained.'}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
                   <div className="bg-indigo-50/70 border border-indigo-100 rounded-lg p-3 text-xs text-indigo-900 flex items-start gap-2">
                     <Info className="w-4 h-4 text-indigo-600 shrink-0 mt-0.5" />
                     <span>
-                      Original uploaded files will be archived byte-for-byte in your current preview order
-                      (01, 02, 03...) without any compression, resizing, or quality loss.
+                      {zipOutputFormat === 'ORIGINAL' &&
+                        'Original uploaded files will be archived byte-for-byte in your current preview order (01, 02, 03...) without any compression, resizing, or quality loss.'}
+                      {zipOutputFormat === 'JPG' &&
+                        `Images will be converted to JPG at ${Math.round(
+                          quality * 100
+                        )}% quality in sequential order (01.jpg, 02.jpg...).`}
+                      {zipOutputFormat === 'PNG' &&
+                        'Images will be converted to lossless PNG in sequential order (01.png, 02.png...).'}
+                      {zipOutputFormat === 'WEBP' &&
+                        `Images will be converted to WEBP at ${Math.round(
+                          quality * 100
+                        )}% quality in sequential order (01.webp, 02.webp...).`}
                     </span>
                   </div>
                 </div>
