@@ -85,19 +85,7 @@ describe('App Component', () => {
     });
   });
 
-  it('opens PDF preview in browser when "Preview in Browser" button is clicked', async () => {
-    const windowOpenSpy = vi.spyOn(window, 'open').mockImplementation(() => {
-      const mockDoc = {
-        title: '',
-        body: {
-          style: {},
-          appendChild: vi.fn(),
-        },
-        createElement: vi.fn().mockReturnValue({ style: {}, src: '' }),
-      };
-      return { document: mockDoc } as unknown as Window;
-    });
-
+  it('generates PDF export and renders Download PDF button without Preview in Browser button', async () => {
     render(<App />);
 
     const file1 = new File(['fake data 1'], 'img1.png', { type: 'image/png' });
@@ -116,13 +104,9 @@ describe('App Component', () => {
 
     await waitFor(() => {
       expect(screen.getByText(/Your PDF is Ready!/i)).toBeDefined();
-      expect(screen.getByText(/Preview in Browser/i)).toBeDefined();
+      expect(screen.getByText(/Download PDF/i)).toBeDefined();
     });
 
-    const previewButton = screen.getByRole('button', { name: /Preview in Browser/i });
-    fireEvent.click(previewButton);
-
-    expect(windowOpenSpy).toHaveBeenCalledWith('', '_blank');
-    windowOpenSpy.mockRestore();
+    expect(screen.queryByText(/Preview in Browser/i)).toBeNull();
   });
 });
