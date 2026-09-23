@@ -51,41 +51,6 @@ export const PdfPreview: React.FC<PdfPreviewProps> = ({
     count = pdfResult.pageCount;
   }
 
-  const handlePreview = (e: React.MouseEvent) => {
-    e.preventDefault();
-    if (!url) return;
-    const previewWindow = window.open('', '_blank');
-    if (previewWindow) {
-      previewWindow.document.write(`
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <title>${filename || 'PDF Preview'}</title>
-            <style>
-              html, body {
-                margin: 0;
-                padding: 0;
-                width: 100%;
-                height: 100%;
-                overflow: hidden;
-                background-color: #525659;
-              }
-              iframe {
-                width: 100%;
-                height: 100%;
-                border: none;
-              }
-            </style>
-          </head>
-          <body>
-            <iframe src="${url}" type="application/pdf"></iframe>
-          </body>
-        </html>
-      `);
-      previewWindow.document.close();
-    }
-  };
-
   return (
     <div className="bg-white border border-slate-200 rounded-2xl p-6 sm:p-8 shadow-md max-w-xl mx-auto space-y-6 text-center animate-fade-in">
       <div className="w-16 h-16 mx-auto rounded-2xl bg-emerald-100 text-emerald-600 flex items-center justify-center">
@@ -145,14 +110,15 @@ export const PdfPreview: React.FC<PdfPreviewProps> = ({
           </button>
 
           {!isZip && (
-            <button
-              type="button"
-              onClick={handlePreview}
+            <a
+              href={url}
+              target="_blank"
+              rel="noopener noreferrer"
               className="inline-flex items-center gap-1.5 text-xs font-medium text-indigo-600 hover:text-indigo-700 py-2 px-3 rounded-lg hover:bg-indigo-50 transition-colors cursor-pointer"
             >
               <FileCheck className="w-4 h-4" />
               <span>Preview in Browser</span>
-            </button>
+            </a>
           )}
         </div>
       </div>
