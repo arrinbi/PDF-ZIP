@@ -66,13 +66,31 @@ export type ExportResult =
   | { mode: 'pdf'; pdf: GeneratedPdfResult }
   | { mode: 'zip'; zip: GeneratedZipResult };
 
+export interface DiscoveredSubfolder {
+  id: string;
+  name: string;
+  files: File[];
+  imageCount: number;
+}
+
+export interface ParentFolderScanResult {
+  parentFolderName: string;
+  subfolders: DiscoveredSubfolder[];
+}
+
 export interface BatchFolder {
   id: string;
   folderName: string;
   images: ImageItem[];
 }
 
-export interface BatchResult {
+export interface BatchResultItem {
+  id: string;
   folderName: string;
-  result: ExportResult;
+  status: 'success' | 'error';
+  exportResult?: ExportResult;
+  filename?: string;
+  downloadUrl?: string;
+  sizeBytes?: number;
+  errorMessage?: string;
 }

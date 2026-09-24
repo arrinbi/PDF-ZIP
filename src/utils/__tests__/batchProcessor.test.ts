@@ -3,6 +3,7 @@ import {
   isAllowedImageFile,
   getRelativePathAndFolderName,
   sortFilesNaturally,
+  scanParentFolder,
   createBatchFolderFromFiles,
   processBatchFolder,
 } from '../batchProcessor';
@@ -44,6 +45,33 @@ describe('batchProcessor utilities', () => {
 
     const sorted = sortFilesNaturally(files);
     expect(sorted.map((f) => f.name)).toEqual(['page1.jpg', 'page2.jpg', 'page10.jpg']);
+  });
+
+  it('scans parent folder and discovers immediate subfolders with natural sorting and non-image filtering', () => {
+    const createWebkitFile = (name: string, relPath: string, mime: string) => {
+      const f = new File(['content'], name, { type: mime });
+      Object.defineProperty(f, 'webkitRelativePath', { value: relPath });
+      return f;
+    };
+
+    const files = [
+      createWebkitFile('02.jpg', 'DCIM/01. Manhwa/02.jpg', 'image/jpeg'),
+      createWebkitFile('01.jpg', 'DCIM/01. Manhwa/01.jpg', 'image/jpeg'),
+      createWebkitFile('notes.txt', 'DCIM/01. Manhwa/notes.txt', 'text/plain'),
+      createWebkitFile('01.jpg', 'DCIM/02. Manhwa/01.jpg', 'image/jpeg'),
+      createWebkitFile('screen.png', 'DCIM/Screenshots/screen.png', 'image/png'),
+    ];
+
+    const scanResult = scanParentFolder(files);
+
+    expect(scanResult.parentFolderName).toBe('DCIM');
+    expect(scanResult.subfolders.length).toBe(3);
+    expect(scanResult.subfolders.map((sf) => sf.name)).toEqual(['01. Manhwa', '02. Manhwa', 'Screenshots']);
+
+    // Check files inside 01. Manhwa
+    const manhwa1 = scanResult.subfolders.find((sf) => sf.name === '01. Manhwa');
+    expect(manhwa1?.imageCount).toBe(2);
+    expect(manhwa1?.files.map((f) => f.name)).toEqual(['01.jpg', '02.jpg']);
   });
 
   it('creates a BatchFolder from files filtering out unrelated files and preserving order', async () => {

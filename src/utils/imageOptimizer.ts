@@ -144,6 +144,19 @@ export async function processImageForPdf(
     };
   }
 
+  const isJpegSource = srcType.includes('jpeg') || srcType.includes('jpg');
+
+  // Optimization for JPEG source -> JPG output:
+  // If quality is 1.0 (100%), embed original JPEG directly without canvas re-encoding bloat.
+  if (targetFormat === 'JPG' && isJpegSource && quality >= 0.99) {
+    return {
+      dataUrl: srcDataUrl,
+      jsPdfFormat: 'JPEG',
+      width: origWidth,
+      height: origHeight,
+    };
+  }
+
   // For canvas processing (JPG, or PNG conversion from non-PNG inputs):
   return new Promise((resolve) => {
     // In node/jsdom test environments without full canvas/Image rendering engine, HTMLImageElement onload may not fire for inline base64 images.
@@ -228,8 +241,17 @@ export async function processImageForPdf(
 
       const encodedDataUrl = canvas.toDataURL(mimeType, clampedQuality);
 
+      // If encoding JPEG source to JPG, check if canvas re-encoding bloated the payload size.
+      // If canvas output is larger or equal in size to original JPEG data URL, prefer original data URL.
+      let finalDataUrl = encodedDataUrl;
+      if (targetFormat === 'JPG' && isJpegSource && srcDataUrl) {
+        if (encodedDataUrl.length >= srcDataUrl.length) {
+          finalDataUrl = srcDataUrl;
+        }
+      }
+
       finish({
-        dataUrl: encodedDataUrl,
+        dataUrl: finalDataUrl,
         jsPdfFormat,
         width: naturalW,
         height: naturalH,

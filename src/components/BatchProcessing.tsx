@@ -1,20 +1,30 @@
 import React, { useRef, useState } from 'react';
-import type { BatchFolder, ExportMode, OutputFormat, ZipOutputFormat } from '../types';
-import { createBatchFolderFromFiles, processBatchFolder } from '../utils/batchProcessor';
+import type {
+  BatchResultItem,
+  DiscoveredSubfolder,
+  ExportMode,
+  OutputFormat,
+  ZipOutputFormat,
+} from '../types';
+import {
+  createBatchFolderFromFiles,
+  processBatchFolder,
+  scanParentFolder,
+} from '../utils/batchProcessor';
 import { formatFileSize } from '../utils/imageOptimizer';
 import {
   FolderPlus,
-  Trash2,
   Play,
   CheckCircle2,
   Folder,
   FileText,
   Archive,
   Sliders,
-  Image as ImageIcon,
   AlertCircle,
   Download,
-  RotateCcw,
+  CheckSquare,
+  Square,
+  FolderTree,
 } from 'lucide-react';
 
 interface BatchProcessingProps {
@@ -22,7 +32,10 @@ interface BatchProcessingProps {
 }
 
 export const BatchProcessing: React.FC<BatchProcessingProps> = () => {
-  const [batches, setBatches] = useState<BatchFolder[]>([]);
+  const [parentFolderName, setParentFolderName] = useState<string>('');
+  const [discoveredSubfolders, setDiscoveredSubfolders] = useState<DiscoveredSubfolder[]>([]);
+  const [selectedFolderIds, setSelectedFolderIds] = useState<Set<string>>(new Set());
+
   const [exportMode, setExportMode] = useState<ExportMode>('pdf');
   const [margin, setMargin] = useState<number>(0);
   const [outputFormat, setOutputFormat] = useState<OutputFormat>('JPG');
@@ -32,7 +45,7 @@ export const BatchProcessing: React.FC<BatchProcessingProps> = () => {
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [currentProcessingIndex, setCurrentProcessingIndex] = useState<number>(-1);
   const [currentProgressText, setCurrentProgressText] = useState<string>('');
-  const [completedResults, setCompletedResults] = useState<{ folderName: string; downloadUrl: string; filename: string; sizeBytes: number }[]>([]);
+  const [batchResults, setBatchResults] = useState<BatchResultItem[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const folderInputRef = useRef<HTMLInputElement>(null);
@@ -40,49 +53,58 @@ export const BatchProcessing: React.FC<BatchProcessingProps> = () => {
   const handleFolderSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) return;
     setErrorMessage(null);
+    setBatchResults([]);
 
     const filesArray = Array.from(e.target.files);
-    // Group files by top-level webkitRelativePath directory or relative folder
-    const groups: Map<string, File[]> = new Map();
+    const scanResult = scanParentFolder(filesArray);
 
-    for (const file of filesArray) {
-      const relPath = file.webkitRelativePath || file.name;
-      const parts = relPath.split('/');
-      const folderName = parts.length > 1 ? parts[0] : 'Selected Folder';
-      if (!groups.has(folderName)) {
-        groups.set(folderName, []);
-      }
-      groups.get(folderName)!.push(file);
-    }
-
-    const newBatches: BatchFolder[] = [];
-    for (const [fName, files] of groups.entries()) {
-      const newBatch = await createBatchFolderFromFiles(files, fName);
-      if (newBatch && newBatch.images.length > 0) {
-        newBatches.push(newBatch);
-      }
-    }
-
-    if (newBatches.length === 0) {
-      setErrorMessage('No valid JPG, PNG, or WEBP images found in the selected folder.');
+    if (scanResult.subfolders.length === 0) {
+      setErrorMessage(
+        'No valid JPG, JPEG, PNG, or WEBP images found in the selected parent folder.'
+      );
+      setParentFolderName('');
+      setDiscoveredSubfolders([]);
+      setSelectedFolderIds(new Set());
     } else {
-      setBatches((prev) => [...prev, ...newBatches]);
+      setParentFolderName(scanResult.parentFolderName);
+      setDiscoveredSubfolders(scanResult.subfolders);
+      // Select all discovered subfolders by default
+      setSelectedFolderIds(new Set(scanResult.subfolders.map((sf) => sf.id)));
     }
 
-    e.target.value = ''; // reset input
+    e.target.value = ''; // Reset input element
   };
 
-  const handleRemoveBatch = (id: string) => {
-    setBatches((prev) => prev.filter((b) => b.id !== id));
+  const handleToggleSubfolder = (id: string) => {
+    setSelectedFolderIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
   };
 
-  const handleClearAll = () => {
-    setBatches([]);
-    setCompletedResults([]);
+  const handleSelectAll = () => {
+    setSelectedFolderIds(new Set(discoveredSubfolders.map((sf) => sf.id)));
+  };
+
+  const handleDeselectAll = () => {
+    setSelectedFolderIds(new Set());
+  };
+
+  const handleClearSelection = () => {
+    setParentFolderName('');
+    setDiscoveredSubfolders([]);
+    setSelectedFolderIds(new Set());
+    setBatchResults([]);
     setErrorMessage(null);
   };
 
   const triggerDownload = (url: string, filename: string) => {
+    if (!url) return;
     const a = document.createElement('a');
     a.href = url;
     a.download = filename;
@@ -91,64 +113,92 @@ export const BatchProcessing: React.FC<BatchProcessingProps> = () => {
     document.body.removeChild(a);
   };
 
+  const handleDownloadAll = () => {
+    const successfulItems = batchResults.filter(
+      (item) => item.status === 'success' && item.downloadUrl
+    );
+    successfulItems.forEach((item, index) => {
+      setTimeout(() => {
+        triggerDownload(item.downloadUrl!, item.filename!);
+      }, index * 250);
+    });
+  };
+
   const handleStartBatchProcessing = async () => {
-    if (batches.length === 0) {
-      setErrorMessage('Please add at least one folder before starting batch processing.');
+    const selectedFolders = discoveredSubfolders.filter((sf) => selectedFolderIds.has(sf.id));
+    if (selectedFolders.length === 0) {
+      setErrorMessage('Please select at least one subfolder to process.');
       return;
     }
 
     setIsProcessing(true);
     setErrorMessage(null);
-    setCompletedResults([]);
+    setBatchResults([]);
 
-    const resultsList: { folderName: string; downloadUrl: string; filename: string; sizeBytes: number }[] = [];
+    const resultsList: BatchResultItem[] = [];
 
     try {
-      for (let i = 0; i < batches.length; i++) {
-        const batch = batches[i];
+      for (let i = 0; i < selectedFolders.length; i++) {
+        const subfolder = selectedFolders[i];
         setCurrentProcessingIndex(i);
-        setCurrentProgressText(`Processing folder ${i + 1} of ${batches.length}: "${batch.folderName}" (${batch.images.length} images)...`);
-
-        const res = await processBatchFolder(
-          batch,
-          exportMode,
-          {
-            pdfOptions: { margin, outputFormat, quality },
-            zipOptions: { outputFormat: zipOutputFormat, quality },
-          },
-          (curr, tot) => {
-            setCurrentProgressText(
-              `Processing "${batch.folderName}": ${curr}/${tot} images...`
-            );
-          }
+        setCurrentProgressText(
+          `Processing folder ${i + 1} of ${selectedFolders.length}: "${subfolder.name}" (${
+            subfolder.imageCount
+          } images)...`
         );
 
-        let downloadUrl = '';
-        let filename = '';
-        let sizeBytes = 0;
+        try {
+          const batchFolder = await createBatchFolderFromFiles(subfolder.files, subfolder.name);
+          if (!batchFolder || batchFolder.images.length === 0) {
+            throw new Error(`No valid images found in "${subfolder.name}".`);
+          }
 
-        if (res.mode === 'pdf') {
-          downloadUrl = res.pdf.url;
-          filename = res.pdf.filename;
-          sizeBytes = res.pdf.sizeBytes;
-        } else {
-          downloadUrl = res.zip.url;
-          filename = res.zip.filename;
-          sizeBytes = res.zip.sizeBytes;
+          const res = await processBatchFolder(
+            batchFolder,
+            exportMode,
+            {
+              pdfOptions: { margin, outputFormat, quality },
+              zipOptions: { outputFormat: zipOutputFormat, quality },
+            },
+            (curr, tot) => {
+              setCurrentProgressText(
+                `Processing "${subfolder.name}": ${curr}/${tot} images...`
+              );
+            }
+          );
+
+          if (res.mode === 'pdf') {
+            resultsList.push({
+              id: subfolder.id,
+              folderName: subfolder.name,
+              status: 'success',
+              exportResult: res,
+              filename: res.pdf.filename,
+              downloadUrl: res.pdf.url,
+              sizeBytes: res.pdf.sizeBytes,
+            });
+          } else {
+            resultsList.push({
+              id: subfolder.id,
+              folderName: subfolder.name,
+              status: 'success',
+              exportResult: res,
+              filename: res.zip.filename,
+              downloadUrl: res.zip.url,
+              sizeBytes: res.zip.sizeBytes,
+            });
+          }
+        } catch (subErr: any) {
+          resultsList.push({
+            id: subfolder.id,
+            folderName: subfolder.name,
+            status: 'error',
+            errorMessage: subErr.message || `Failed to process folder "${subfolder.name}".`,
+          });
         }
-
-        resultsList.push({
-          folderName: batch.folderName,
-          downloadUrl,
-          filename,
-          sizeBytes,
-        });
-
-        // Trigger immediate browser download
-        triggerDownload(downloadUrl, filename);
       }
 
-      setCompletedResults(resultsList);
+      setBatchResults(resultsList);
     } catch (err: any) {
       console.error(err);
       setErrorMessage(err.message || 'An error occurred during batch processing.');
@@ -158,7 +208,10 @@ export const BatchProcessing: React.FC<BatchProcessingProps> = () => {
     }
   };
 
-  const totalImagesAcrossBatches = batches.reduce((acc, b) => acc + b.images.length, 0);
+  const selectedCount = selectedFolderIds.size;
+  const totalSelectedImages = discoveredSubfolders
+    .filter((sf) => selectedFolderIds.has(sf.id))
+    .reduce((sum, sf) => sum + sf.imageCount, 0);
 
   return (
     <div className="space-y-6">
@@ -166,7 +219,7 @@ export const BatchProcessing: React.FC<BatchProcessingProps> = () => {
       <input
         ref={folderInputRef}
         type="file"
-        // @ts-expect-error webkitdirectory is standard in HTML input but non-standard TS attribute
+        // @ts-expect-error webkitdirectory is standard in HTML input
         webkitdirectory="true"
         directory=""
         multiple
@@ -189,63 +242,118 @@ export const BatchProcessing: React.FC<BatchProcessingProps> = () => {
         </div>
       )}
 
-      {/* Completed Batch View */}
-      {completedResults.length > 0 && !isProcessing ? (
-        <div className="bg-white border border-slate-200 rounded-2xl p-6 space-y-6">
-          <div className="flex items-center gap-3 border-b border-slate-100 pb-4">
-            <div className="w-10 h-10 rounded-xl bg-green-50 text-green-600 flex items-center justify-center">
-              <CheckCircle2 className="w-6 h-6" />
+      {/* View 1: Processing Complete (Results View - NO Automatic Downloads) */}
+      {batchResults.length > 0 && !isProcessing ? (
+        <div className="bg-white border border-slate-200 rounded-2xl p-6 space-y-6 shadow-xs">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-green-50 text-green-600 flex items-center justify-center">
+                <CheckCircle2 className="w-6 h-6" />
+              </div>
+              <div>
+                <h2 className="text-lg font-bold text-slate-800">
+                  Batch Processing Complete
+                </h2>
+                <p className="text-xs text-slate-500">
+                  Processed {batchResults.length} folders ({batchResults.filter((r) => r.status === 'success').length} successful
+                  {batchResults.some((r) => r.status === 'error') ? `, ${batchResults.filter((r) => r.status === 'error').length} failed` : ''})
+                </p>
+              </div>
             </div>
-            <div>
-              <h2 className="text-lg font-bold text-slate-800">
-                Batch Processing Complete!
-              </h2>
-              <p className="text-xs text-slate-500">
-                Processed {completedResults.length} folders successfully. Downloads started automatically.
-              </p>
-            </div>
+
+            {batchResults.some((r) => r.status === 'success') && (
+              <button
+                type="button"
+                onClick={handleDownloadAll}
+                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs sm:text-sm rounded-xl shadow-xs transition-all flex items-center gap-2 cursor-pointer"
+              >
+                <Download className="w-4 h-4" />
+                <span>Download All</span>
+              </button>
+            )}
           </div>
 
+          {/* Results List */}
           <div className="space-y-3">
-            {completedResults.map((item, idx) => (
+            {batchResults.map((item) => (
               <div
-                key={idx}
-                className="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm"
+                key={item.id}
+                className={`flex items-center justify-between border rounded-xl p-3.5 text-sm transition-colors ${
+                  item.status === 'success'
+                    ? 'bg-slate-50 border-slate-200'
+                    : 'bg-red-50/50 border-red-200 text-red-900'
+                }`}
               >
                 <div className="flex items-center gap-3">
-                  <Folder className="w-5 h-5 text-indigo-600" />
+                  <div
+                    className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                      item.status === 'success'
+                        ? 'bg-indigo-50 text-indigo-600'
+                        : 'bg-red-100 text-red-600'
+                    }`}
+                  >
+                    {exportMode === 'pdf' ? (
+                      <FileText className="w-4 h-4" />
+                    ) : (
+                      <Archive className="w-4 h-4" />
+                    )}
+                  </div>
                   <div>
-                    <p className="font-semibold text-slate-800">{item.filename}</p>
-                    <p className="text-xs text-slate-500">{formatFileSize(item.sizeBytes)}</p>
+                    <p className="font-semibold text-slate-800">{item.folderName}</p>
+                    {item.status === 'success' ? (
+                      <p className="text-xs text-slate-500 flex items-center gap-2">
+                        <span className="font-medium text-emerald-600">
+                          {exportMode.toUpperCase()} ready
+                        </span>
+                        <span>•</span>
+                        <span>{formatFileSize(item.sizeBytes || 0)}</span>
+                      </p>
+                    ) : (
+                      <p className="text-xs text-red-600 font-medium">
+                        {item.errorMessage || 'Failed to process folder'}
+                      </p>
+                    )}
                   </div>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => triggerDownload(item.downloadUrl, item.filename)}
-                  className="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  <span>Download Again</span>
-                </button>
+                {item.status === 'success' && item.downloadUrl && (
+                  <button
+                    type="button"
+                    onClick={() => triggerDownload(item.downloadUrl!, item.filename!)}
+                    className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>Download</span>
+                  </button>
+                )}
               </div>
             ))}
           </div>
 
-          <div className="pt-2 flex justify-end gap-3">
+          <div className="pt-2 flex items-center justify-between border-t border-slate-100">
             <button
               type="button"
-              onClick={() => setCompletedResults([])}
-              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm rounded-xl flex items-center gap-2 cursor-pointer"
+              onClick={() => setBatchResults([])}
+              className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium text-xs sm:text-sm rounded-xl transition-colors cursor-pointer"
             >
-              <RotateCcw className="w-4 h-4" />
-              <span>Process Another Batch</span>
+              Back to Folder Selection
             </button>
+
+            {batchResults.some((r) => r.status === 'success') && (
+              <button
+                type="button"
+                onClick={handleDownloadAll}
+                className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs sm:text-sm rounded-xl shadow-xs transition-all flex items-center gap-2 cursor-pointer"
+              >
+                <Download className="w-4 h-4" />
+                <span>Download All ({batchResults.filter((r) => r.status === 'success').length})</span>
+              </button>
+            )}
           </div>
         </div>
       ) : isProcessing ? (
-        /* Progress View */
-        <div className="bg-white border border-slate-200 rounded-2xl p-8 space-y-6 text-center">
+        /* View 2: Progress View */
+        <div className="bg-white border border-slate-200 rounded-2xl p-8 space-y-6 text-center shadow-xs">
           <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 mx-auto flex items-center justify-center animate-pulse">
             <Play className="w-6 h-6" />
           </div>
@@ -258,8 +366,12 @@ export const BatchProcessing: React.FC<BatchProcessingProps> = () => {
               className="bg-indigo-600 h-2.5 rounded-full transition-all duration-300"
               style={{
                 width: `${
-                  batches.length > 0 && currentProcessingIndex >= 0
-                    ? Math.round(((currentProcessingIndex + 1) / batches.length) * 100)
+                  discoveredSubfolders.length > 0 && currentProcessingIndex >= 0
+                    ? Math.round(
+                        ((currentProcessingIndex + 1) /
+                          discoveredSubfolders.filter((sf) => selectedFolderIds.has(sf.id)).length) *
+                          100
+                      )
                     : 0
                 }%`,
               }}
@@ -267,18 +379,18 @@ export const BatchProcessing: React.FC<BatchProcessingProps> = () => {
           </div>
         </div>
       ) : (
-        /* Main Batch Selection View */
+        /* View 3: Main Batch Folder Chooser & Checklist Selection View */
         <div className="space-y-6">
-          {/* Top Actions & Options Card */}
+          {/* Top Options & Select Parent Folder Header */}
           <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-5 shadow-xs">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
               <div>
                 <h2 className="text-base font-bold text-slate-800 flex items-center gap-2">
-                  <FolderPlus className="w-5 h-5 text-indigo-600" />
-                  Batch Folder Selection
+                  <FolderTree className="w-5 h-5 text-indigo-600" />
+                  Batch Parent Folder
                 </h2>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Select specific folders one by one. Each folder will be processed into an independent {exportMode.toUpperCase()} file.
+                  Select a parent directory to automatically scan and convert its subfolders into individual {exportMode.toUpperCase()} files.
                 </p>
               </div>
 
@@ -286,24 +398,24 @@ export const BatchProcessing: React.FC<BatchProcessingProps> = () => {
                 <button
                   type="button"
                   onClick={() => folderInputRef.current?.click()}
-                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 active:scale-98 text-white text-xs sm:text-sm font-semibold rounded-xl shadow-xs transition-all flex items-center gap-2 cursor-pointer"
+                  className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 active:scale-98 text-white text-xs sm:text-sm font-semibold rounded-xl shadow-xs transition-all flex items-center gap-2 cursor-pointer"
                 >
                   <FolderPlus className="w-4 h-4" />
-                  <span>Add Folder</span>
+                  <span>{parentFolderName ? 'Select Different Parent Folder' : 'Select Parent Folder'}</span>
                 </button>
               </div>
             </div>
 
-            {/* Export Format Settings */}
+            {/* Export Mode & Quality Settings */}
             <div className="space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                 <div className="flex items-center gap-2 text-slate-800 font-semibold text-xs">
                   <Sliders className="w-4 h-4 text-indigo-600" />
-                  <span>Batch Output Settings</span>
+                  <span>Output Settings</span>
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <span className="text-xs font-medium text-slate-500">Output format:</span>
+                  <span className="text-xs font-medium text-slate-500">Output mode:</span>
                   <div className="inline-flex p-1 bg-slate-100 rounded-xl border border-slate-200">
                     <button
                       type="button"
@@ -440,8 +552,8 @@ export const BatchProcessing: React.FC<BatchProcessingProps> = () => {
             </div>
           </div>
 
-          {/* Selected Batches List */}
-          {batches.length === 0 ? (
+          {/* Subfolders Checklist Section */}
+          {discoveredSubfolders.length === 0 ? (
             <div
               onClick={() => folderInputRef.current?.click()}
               className="border-2 border-dashed border-slate-300 hover:border-indigo-500 bg-white hover:bg-indigo-50/20 transition-all rounded-2xl p-10 text-center cursor-pointer flex flex-col items-center justify-center min-h-[220px]"
@@ -450,59 +562,98 @@ export const BatchProcessing: React.FC<BatchProcessingProps> = () => {
                 <FolderPlus className="w-7 h-7" />
               </div>
               <h3 className="text-base font-semibold text-slate-800 mb-1">
-                No Folders Selected Yet
+                No Parent Folder Selected
               </h3>
               <p className="text-xs sm:text-sm text-slate-500 mb-4 max-w-md">
-                Click here or use the "Add Folder" button above to select individual folders for batch processing.
+                Click here or use the "Select Parent Folder" button above to choose a directory containing subfolders.
               </p>
             </div>
           ) : (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-slate-500">
-                  Selected Folders ({batches.length}) • Total Images ({totalImagesAcrossBatches})
-                </span>
-                <button
-                  type="button"
-                  onClick={handleClearAll}
-                  className="text-xs text-red-600 hover:text-red-700 font-medium cursor-pointer"
-                >
-                  Clear All Folders
-                </button>
+            <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-4 shadow-xs">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                <div>
+                  <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                    <span>Parent Directory:</span>
+                    <span className="text-indigo-600 font-extrabold">{parentFolderName}</span>
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    {selectedCount} of {discoveredSubfolders.length} subfolders selected ({totalSelectedImages} images to process)
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={handleSelectAll}
+                    className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 cursor-pointer flex items-center gap-1"
+                  >
+                    <CheckSquare className="w-3.5 h-3.5" />
+                    <span>Select All</span>
+                  </button>
+                  <span className="text-slate-300">|</span>
+                  <button
+                    type="button"
+                    onClick={handleDeselectAll}
+                    className="text-xs font-semibold text-slate-500 hover:text-slate-700 cursor-pointer flex items-center gap-1"
+                  >
+                    <Square className="w-3.5 h-3.5" />
+                    <span>Deselect All</span>
+                  </button>
+                  <span className="text-slate-300">|</span>
+                  <button
+                    type="button"
+                    onClick={handleClearSelection}
+                    className="text-xs font-semibold text-red-600 hover:text-red-700 cursor-pointer"
+                  >
+                    Clear Selection
+                  </button>
+                </div>
               </div>
 
-              <div className="space-y-2">
-                {batches.map((b, index) => (
-                  <div
-                    key={b.id}
-                    className="flex items-center justify-between bg-white border border-slate-200 rounded-xl p-3.5 shadow-2xs hover:border-slate-300 transition-colors"
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className="w-6 h-6 rounded-lg bg-slate-100 text-slate-600 font-bold text-xs flex items-center justify-center">
-                        {index + 1}
-                      </span>
-                      <Folder className="w-5 h-5 text-indigo-600" />
-                      <div>
-                        <h4 className="text-sm font-semibold text-slate-800">{b.folderName}</h4>
-                        <p className="text-xs text-slate-500 flex items-center gap-1.5 mt-0.5">
-                          <ImageIcon className="w-3 h-3 text-slate-400" />
-                          <span>
-                            {b.images.length} valid images (JPG/PNG/WEBP)
-                          </span>
-                        </p>
-                      </div>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveBatch(b.id)}
-                      className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
-                      title="Remove folder"
+              {/* Subfolder Checklist List */}
+              <div className="space-y-2 max-h-[380px] overflow-y-auto pr-1">
+                {discoveredSubfolders.map((sf) => {
+                  const isChecked = selectedFolderIds.has(sf.id);
+                  return (
+                    <label
+                      key={sf.id}
+                      onClick={(e) => {
+                        // Prevent double-toggling if input element receives click
+                        e.preventDefault();
+                        handleToggleSubfolder(sf.id);
+                      }}
+                      className={`flex items-center justify-between border rounded-xl p-3 cursor-pointer transition-all ${
+                        isChecked
+                          ? 'bg-indigo-50/60 border-indigo-200 shadow-2xs'
+                          : 'bg-white border-slate-200 hover:bg-slate-50 opacity-75'
+                      }`}
                     >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                ))}
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => {}} // handled by parent onClick
+                          className="w-4 h-4 text-indigo-600 rounded-md border-slate-300 focus:ring-indigo-500 cursor-pointer"
+                        />
+                        <Folder className={`w-5 h-5 ${isChecked ? 'text-indigo-600' : 'text-slate-400'}`} />
+                        <div>
+                          <p className={`text-sm font-semibold ${isChecked ? 'text-slate-900' : 'text-slate-600'}`}>
+                            {sf.name}
+                          </p>
+                          <p className="text-xs text-slate-500 mt-0.5">
+                            {sf.imageCount} image{sf.imageCount === 1 ? '' : 's'} (JPG/PNG/WEBP)
+                          </p>
+                        </div>
+                      </div>
+
+                      <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                        isChecked ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-500'
+                      }`}>
+                        {isChecked ? 'Selected' : 'Ignored'}
+                      </span>
+                    </label>
+                  );
+                })}
               </div>
 
               {/* Action Button */}
@@ -510,11 +661,16 @@ export const BatchProcessing: React.FC<BatchProcessingProps> = () => {
                 <button
                   type="button"
                   onClick={handleStartBatchProcessing}
-                  className="py-3 px-6 bg-indigo-600 hover:bg-indigo-700 active:scale-98 text-white font-semibold text-sm rounded-xl shadow-md shadow-indigo-200 transition-all flex items-center gap-2 cursor-pointer"
+                  disabled={selectedCount === 0}
+                  className={`py-3 px-6 text-white font-semibold text-sm rounded-xl transition-all flex items-center gap-2 ${
+                    selectedCount > 0
+                      ? 'bg-indigo-600 hover:bg-indigo-700 active:scale-98 shadow-md shadow-indigo-200 cursor-pointer'
+                      : 'bg-slate-300 cursor-not-allowed opacity-60'
+                  }`}
                 >
                   <Play className="w-4 h-4 fill-white" />
                   <span>
-                    Process All Batches ({batches.length} {exportMode === 'pdf' ? 'PDFs' : 'ZIPs'})
+                    Process Selected Folders ({selectedCount} {exportMode === 'pdf' ? 'PDFs' : 'ZIPs'})
                   </span>
                 </button>
               </div>

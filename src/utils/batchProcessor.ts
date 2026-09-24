@@ -1,4 +1,13 @@
-import type { BatchFolder, ExportMode, ImageItem, PdfOptions, ZipOptions, ExportResult } from '../types';
+import type {
+  BatchFolder,
+  DiscoveredSubfolder,
+  ExportMode,
+  ExportResult,
+  ImageItem,
+  ParentFolderScanResult,
+  PdfOptions,
+  ZipOptions,
+} from '../types';
 import { readImageData } from './imageOptimizer';
 import { generatePdfFromImages } from './pdfGenerator';
 import { generateZipFromImages } from './zipGenerator';
@@ -32,6 +41,66 @@ export function sortFilesNaturally(files: File[]): File[] {
   return [...files].sort((a, b) =>
     a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' })
   );
+}
+
+/**
+ * Scans a list of files selected from a parent directory (via webkitdirectory)
+ * and discovers immediate subfolders containing valid image files (JPG, JPEG, PNG, WEBP).
+ */
+export function scanParentFolder(files: File[]): ParentFolderScanResult {
+  const allowedFiles = files.filter(isAllowedImageFile);
+
+  if (allowedFiles.length === 0) {
+    return { parentFolderName: '', subfolders: [] };
+  }
+
+  // Extract parent folder name from first file's webkitRelativePath
+  const firstPath = allowedFiles[0].webkitRelativePath || allowedFiles[0].name;
+  const firstParts = firstPath.split('/');
+  const parentFolderName = firstParts.length > 1 ? firstParts[0] : 'Parent Folder';
+
+  // Group allowed files by immediate subfolder (parts[1] if parts.length >= 3)
+  const groupMap = new Map<string, File[]>();
+
+  for (const file of allowedFiles) {
+    const relPath = file.webkitRelativePath || file.name;
+    const parts = relPath.split('/');
+    let subfolderName = '';
+
+    if (parts.length >= 3) {
+      subfolderName = parts[1];
+    } else if (parts.length === 2) {
+      subfolderName = `${parentFolderName} (Root)`;
+    } else {
+      subfolderName = 'Root';
+    }
+
+    if (!groupMap.has(subfolderName)) {
+      groupMap.set(subfolderName, []);
+    }
+    groupMap.get(subfolderName)!.push(file);
+  }
+
+  // Sort subfolder names naturally
+  const sortedSubfolderNames = Array.from(groupMap.keys()).sort((a, b) =>
+    a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' })
+  );
+
+  const subfolders: DiscoveredSubfolder[] = sortedSubfolderNames.map((name, index) => {
+    const rawFiles = groupMap.get(name)!;
+    const sortedFiles = sortFilesNaturally(rawFiles);
+    return {
+      id: `subfolder-${index}-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      name,
+      files: sortedFiles,
+      imageCount: sortedFiles.length,
+    };
+  });
+
+  return {
+    parentFolderName,
+    subfolders,
+  };
 }
 
 /**

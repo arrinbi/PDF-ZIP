@@ -108,5 +108,22 @@ describe('imageOptimizer utilities', () => {
       expect(result.width).toBe(100);
       expect(result.height).toBe(100);
     });
+
+    it('embeds original JPEG dataUrl directly without re-encoding bloat for JPEG source', async () => {
+      const jpegItem: ImageItem = {
+        id: 'jpeg-1',
+        file: new File([], 'test.jpg', { type: 'image/jpeg' }),
+        name: 'test.jpg',
+        size: 500,
+        type: 'image/jpeg',
+        previewUrl: 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=',
+        width: 100,
+        height: 100,
+      };
+
+      const resultFull = await processImageForPdf(jpegItem, 'JPG', 1.0);
+      expect(resultFull.jsPdfFormat).toBe('JPEG');
+      expect(resultFull.dataUrl).toBe(jpegItem.previewUrl);
+    });
   });
 });
