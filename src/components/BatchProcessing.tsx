@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import type {
   BatchResultItem,
   DiscoveredSubfolder,
@@ -54,10 +54,38 @@ export const BatchProcessing: React.FC<BatchProcessingProps> = () => {
 
   const folderInputRef = useRef<HTMLInputElement>(null);
 
+  // Clean up Object URLs when batch results change or component unmounts
+  useEffect(() => {
+    return () => {
+      batchResults.forEach((item) => {
+        if (item.downloadUrl) {
+          try {
+            URL.revokeObjectURL(item.downloadUrl);
+          } catch {
+            // ignore
+          }
+        }
+      });
+    };
+  }, [batchResults]);
+
+  const clearBatchResultsWithCleanup = () => {
+    batchResults.forEach((item) => {
+      if (item.downloadUrl) {
+        try {
+          URL.revokeObjectURL(item.downloadUrl);
+        } catch {
+          // ignore
+        }
+      }
+    });
+    setBatchResults([]);
+  };
+
   const handleFolderSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) return;
     setErrorMessage(null);
-    setBatchResults([]);
+    clearBatchResultsWithCleanup();
 
     const filesArray = Array.from(e.target.files);
     const scanResult = scanParentFolder(filesArray);
@@ -112,7 +140,7 @@ export const BatchProcessing: React.FC<BatchProcessingProps> = () => {
     setDiscoveredSubfolders([]);
     setSelectedFolderIds(new Set());
     setCustomOutputNames({});
-    setBatchResults([]);
+    clearBatchResultsWithCleanup();
     setErrorMessage(null);
   };
 
@@ -164,7 +192,7 @@ export const BatchProcessing: React.FC<BatchProcessingProps> = () => {
 
     setIsProcessing(true);
     setErrorMessage(null);
-    setBatchResults([]);
+    clearBatchResultsWithCleanup();
 
     const resultsList: BatchResultItem[] = [];
 
@@ -181,11 +209,16 @@ export const BatchProcessing: React.FC<BatchProcessingProps> = () => {
           } images)...`
         );
 
+        // Yield to browser event loop before beginning each folder to keep UI responsive & allow GC
+        await new Promise((resolve) => setTimeout(resolve, 20));
+
         try {
-          const batchFolder = await createBatchFolderFromFiles(
+          // Process folder on-demand: create batch folder images & generate PDF/ZIP within this step
+          let batchFolder = await createBatchFolderFromFiles(
             subfolder.files,
             sanitizedOutputName
           );
+
           if (!batchFolder || batchFolder.images.length === 0) {
             throw new Error(`No valid images found in "${sanitizedOutputName}".`);
           }
@@ -199,17 +232,19 @@ export const BatchProcessing: React.FC<BatchProcessingProps> = () => {
             },
             (curr, tot) => {
               setCurrentProgressText(
-                `Processing "${sanitizedOutputName}": ${curr}/${tot} images...`
+                `Processing folder ${i + 1} of ${selectedFolders.length}: "${sanitizedOutputName}" (${curr}/${tot} images)...`
               );
             }
           );
+
+          // Clear reference to batchFolder immediately so temporary image items can be garbage collected
+          batchFolder = null;
 
           if (res.mode === 'pdf') {
             resultsList.push({
               id: subfolder.id,
               folderName: sanitizedOutputName,
               status: 'success',
-              exportResult: res,
               filename: res.pdf.filename,
               downloadUrl: res.pdf.url,
               sizeBytes: res.pdf.sizeBytes,
@@ -219,7 +254,6 @@ export const BatchProcessing: React.FC<BatchProcessingProps> = () => {
               id: subfolder.id,
               folderName: sanitizedOutputName,
               status: 'success',
-              exportResult: res,
               filename: res.zip.filename,
               downloadUrl: res.zip.url,
               sizeBytes: res.zip.sizeBytes,
@@ -233,6 +267,9 @@ export const BatchProcessing: React.FC<BatchProcessingProps> = () => {
             errorMessage: subErr.message || `Failed to process folder "${sanitizedOutputName}".`,
           });
         }
+
+        // Brief yield to allow memory release / DOM repaint after folder completes
+        await new Promise((resolve) => setTimeout(resolve, 20));
       }
 
       setBatchResults(resultsList);
@@ -370,7 +407,7 @@ export const BatchProcessing: React.FC<BatchProcessingProps> = () => {
           <div className="pt-2 flex items-center justify-between border-t border-slate-100">
             <button
               type="button"
-              onClick={() => setBatchResults([])}
+              onClick={clearBatchResultsWithCleanup}
               className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium text-xs sm:text-sm rounded-xl transition-colors cursor-pointer"
             >
               Back to Folder Selection
