@@ -11,6 +11,7 @@ import {
   processBatchFolder,
   scanParentFolder,
 } from '../utils/batchProcessor';
+import { sanitizeFilename } from '../utils/fileNaming';
 import { formatFileSize } from '../utils/imageOptimizer';
 import {
   FolderPlus,
@@ -35,6 +36,9 @@ export const BatchProcessing: React.FC<BatchProcessingProps> = () => {
   const [parentFolderName, setParentFolderName] = useState<string>('');
   const [discoveredSubfolders, setDiscoveredSubfolders] = useState<DiscoveredSubfolder[]>([]);
   const [selectedFolderIds, setSelectedFolderIds] = useState<Set<string>>(new Set());
+
+  // Mapping subfolder ID -> customized output filename
+  const [customOutputNames, setCustomOutputNames] = useState<Record<string, string>>({});
 
   const [exportMode, setExportMode] = useState<ExportMode>('pdf');
   const [margin, setMargin] = useState<number>(0);
@@ -65,11 +69,19 @@ export const BatchProcessing: React.FC<BatchProcessingProps> = () => {
       setParentFolderName('');
       setDiscoveredSubfolders([]);
       setSelectedFolderIds(new Set());
+      setCustomOutputNames({});
     } else {
       setParentFolderName(scanResult.parentFolderName);
       setDiscoveredSubfolders(scanResult.subfolders);
       // Select all discovered subfolders by default
       setSelectedFolderIds(new Set(scanResult.subfolders.map((sf) => sf.id)));
+
+      // Initialize custom output names with original subfolder names
+      const initialNames: Record<string, string> = {};
+      scanResult.subfolders.forEach((sf) => {
+        initialNames[sf.id] = sf.name;
+      });
+      setCustomOutputNames(initialNames);
     }
 
     e.target.value = ''; // Reset input element
@@ -99,8 +111,27 @@ export const BatchProcessing: React.FC<BatchProcessingProps> = () => {
     setParentFolderName('');
     setDiscoveredSubfolders([]);
     setSelectedFolderIds(new Set());
+    setCustomOutputNames({});
     setBatchResults([]);
     setErrorMessage(null);
+  };
+
+  const handleOutputNameChange = (id: string, newName: string) => {
+    setCustomOutputNames((prev) => ({
+      ...prev,
+      [id]: newName,
+    }));
+  };
+
+  const handleOutputNameBlur = (id: string, originalName: string) => {
+    setCustomOutputNames((prev) => {
+      const current = prev[id];
+      const sanitized = sanitizeFilename(current, originalName);
+      return {
+        ...prev,
+        [id]: sanitized,
+      };
+    });
   };
 
   const triggerDownload = (url: string, filename: string) => {
@@ -140,17 +171,23 @@ export const BatchProcessing: React.FC<BatchProcessingProps> = () => {
     try {
       for (let i = 0; i < selectedFolders.length; i++) {
         const subfolder = selectedFolders[i];
+        const rawOutputName = customOutputNames[subfolder.id] || subfolder.name;
+        const sanitizedOutputName = sanitizeFilename(rawOutputName, subfolder.name);
+
         setCurrentProcessingIndex(i);
         setCurrentProgressText(
-          `Processing folder ${i + 1} of ${selectedFolders.length}: "${subfolder.name}" (${
+          `Processing folder ${i + 1} of ${selectedFolders.length}: "${sanitizedOutputName}" (${
             subfolder.imageCount
           } images)...`
         );
 
         try {
-          const batchFolder = await createBatchFolderFromFiles(subfolder.files, subfolder.name);
+          const batchFolder = await createBatchFolderFromFiles(
+            subfolder.files,
+            sanitizedOutputName
+          );
           if (!batchFolder || batchFolder.images.length === 0) {
-            throw new Error(`No valid images found in "${subfolder.name}".`);
+            throw new Error(`No valid images found in "${sanitizedOutputName}".`);
           }
 
           const res = await processBatchFolder(
@@ -162,7 +199,7 @@ export const BatchProcessing: React.FC<BatchProcessingProps> = () => {
             },
             (curr, tot) => {
               setCurrentProgressText(
-                `Processing "${subfolder.name}": ${curr}/${tot} images...`
+                `Processing "${sanitizedOutputName}": ${curr}/${tot} images...`
               );
             }
           );
@@ -170,7 +207,7 @@ export const BatchProcessing: React.FC<BatchProcessingProps> = () => {
           if (res.mode === 'pdf') {
             resultsList.push({
               id: subfolder.id,
-              folderName: subfolder.name,
+              folderName: sanitizedOutputName,
               status: 'success',
               exportResult: res,
               filename: res.pdf.filename,
@@ -180,7 +217,7 @@ export const BatchProcessing: React.FC<BatchProcessingProps> = () => {
           } else {
             resultsList.push({
               id: subfolder.id,
-              folderName: subfolder.name,
+              folderName: sanitizedOutputName,
               status: 'success',
               exportResult: res,
               filename: res.zip.filename,
@@ -191,9 +228,9 @@ export const BatchProcessing: React.FC<BatchProcessingProps> = () => {
         } catch (subErr: any) {
           resultsList.push({
             id: subfolder.id,
-            folderName: subfolder.name,
+            folderName: sanitizedOutputName,
             status: 'error',
-            errorMessage: subErr.message || `Failed to process folder "${subfolder.name}".`,
+            errorMessage: subErr.message || `Failed to process folder "${sanitizedOutputName}".`,
           });
         }
       }
@@ -611,47 +648,68 @@ export const BatchProcessing: React.FC<BatchProcessingProps> = () => {
               </div>
 
               {/* Subfolder Checklist List */}
-              <div className="space-y-2 max-h-[380px] overflow-y-auto pr-1">
+              <div className="space-y-3 max-h-[420px] overflow-y-auto pr-1">
                 {discoveredSubfolders.map((sf) => {
                   const isChecked = selectedFolderIds.has(sf.id);
+                  const currentOutputName = customOutputNames[sf.id] ?? sf.name;
+
                   return (
-                    <label
+                    <div
                       key={sf.id}
-                      onClick={(e) => {
-                        // Prevent double-toggling if input element receives click
-                        e.preventDefault();
-                        handleToggleSubfolder(sf.id);
-                      }}
-                      className={`flex items-center justify-between border rounded-xl p-3 cursor-pointer transition-all ${
+                      onClick={() => handleToggleSubfolder(sf.id)}
+                      className={`flex flex-col sm:flex-row sm:items-center justify-between border rounded-xl p-3 cursor-pointer transition-all gap-3 ${
                         isChecked
                           ? 'bg-indigo-50/60 border-indigo-200 shadow-2xs'
                           : 'bg-white border-slate-200 hover:bg-slate-50 opacity-75'
                       }`}
                     >
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-start sm:items-center gap-3 min-w-0 flex-1">
                         <input
                           type="checkbox"
                           checked={isChecked}
                           onChange={() => {}} // handled by parent onClick
-                          className="w-4 h-4 text-indigo-600 rounded-md border-slate-300 focus:ring-indigo-500 cursor-pointer"
+                          className="w-4 h-4 mt-1 sm:mt-0 text-indigo-600 rounded-md border-slate-300 focus:ring-indigo-500 cursor-pointer shrink-0"
                         />
-                        <Folder className={`w-5 h-5 ${isChecked ? 'text-indigo-600' : 'text-slate-400'}`} />
-                        <div>
-                          <p className={`text-sm font-semibold ${isChecked ? 'text-slate-900' : 'text-slate-600'}`}>
-                            {sf.name}
-                          </p>
-                          <p className="text-xs text-slate-500 mt-0.5">
-                            {sf.imageCount} image{sf.imageCount === 1 ? '' : 's'} (JPG/PNG/WEBP)
-                          </p>
+                        <Folder className={`w-5 h-5 shrink-0 mt-0.5 sm:mt-0 ${isChecked ? 'text-indigo-600' : 'text-slate-400'}`} />
+                        <div className="min-w-0 flex-1 space-y-1.5">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className={`text-sm font-semibold truncate ${isChecked ? 'text-slate-900' : 'text-slate-600'}`}>
+                              {sf.name}
+                            </p>
+                            <span className="text-xs text-slate-500">
+                              • {sf.imageCount} image{sf.imageCount === 1 ? '' : 's'}
+                            </span>
+                          </div>
+
+                          <div
+                            className="flex items-center gap-2"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <label
+                              htmlFor={`output-name-${sf.id}`}
+                              className="text-xs font-medium text-slate-600 shrink-0"
+                            >
+                              Output name:
+                            </label>
+                            <input
+                              id={`output-name-${sf.id}`}
+                              type="text"
+                              value={currentOutputName}
+                              onChange={(e) => handleOutputNameChange(sf.id, e.target.value)}
+                              onBlur={() => handleOutputNameBlur(sf.id, sf.name)}
+                              className="px-2.5 py-1 text-xs border border-slate-300 rounded-lg bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-hidden min-w-[200px] max-w-full text-slate-800"
+                              placeholder="Enter output name"
+                            />
+                          </div>
                         </div>
                       </div>
 
-                      <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                      <span className={`text-xs font-semibold px-2 py-0.5 rounded-full self-start sm:self-center shrink-0 ${
                         isChecked ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-500'
                       }`}>
                         {isChecked ? 'Selected' : 'Ignored'}
                       </span>
-                    </label>
+                    </div>
                   );
                 })}
               </div>
