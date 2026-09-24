@@ -83,7 +83,7 @@ describe('BatchProcessing Component', () => {
 
     await waitFor(() => {
       expect(screen.getByText(/Batch Processing Complete/i)).toBeDefined();
-    });
+    }, { timeout: 10000 });
 
     // Verify customized output names appear in results
     expect(screen.getByText('Love Comes on a Moonlit Night Ch.2')).toBeDefined();

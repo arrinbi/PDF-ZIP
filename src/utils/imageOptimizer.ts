@@ -91,6 +91,79 @@ export function readImageData(file: File): Promise<{ previewUrl: string; width: 
 }
 
 /**
+ * Gets image dimensions from a File using Object URL without loading Base64 data into memory.
+ */
+export function getImageDimensionsFromFile(file: File): Promise<{ width: number; height: number }> {
+  return new Promise((resolve) => {
+    if (typeof window === 'undefined' || !window.URL || !window.URL.createObjectURL) {
+      resolve({ width: 1000, height: 1000 });
+      return;
+    }
+
+    let objectUrl = '';
+    try {
+      objectUrl = URL.createObjectURL(file);
+    } catch {
+      resolve({ width: 1000, height: 1000 });
+      return;
+    }
+
+    const img = new Image();
+    let settled = false;
+
+    const cleanup = () => {
+      if (objectUrl) {
+        try {
+          URL.revokeObjectURL(objectUrl);
+        } catch {}
+      }
+    };
+
+    const timer = setTimeout(() => {
+      if (!settled) {
+        settled = true;
+        cleanup();
+        resolve({ width: 1000, height: 1000 });
+      }
+    }, 300);
+
+    img.onload = () => {
+      if (!settled) {
+        settled = true;
+        clearTimeout(timer);
+        const w = img.naturalWidth || img.width || 1000;
+        const h = img.naturalHeight || img.height || 1000;
+        cleanup();
+        resolve({ width: w, height: h });
+      }
+    };
+
+    img.onerror = () => {
+      if (!settled) {
+        settled = true;
+        clearTimeout(timer);
+        cleanup();
+        resolve({ width: 1000, height: 1000 });
+      }
+    };
+
+    img.src = objectUrl;
+  });
+}
+
+/**
+ * Reads a File into a Data URL string on-demand.
+ */
+export function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => resolve((e.target?.result as string) || '');
+    reader.onerror = () => reject(new Error('Failed to read file as Data URL.'));
+    reader.readAsDataURL(file);
+  });
+}
+
+/**
  * Returns original image data directly without canvas re-encoding or compression.
  */
 export async function optimizeSingleImage(
@@ -119,12 +192,21 @@ export async function processImageForPdf(
   targetFormat: OutputFormat | 'WEBP' = 'JPG',
   quality: number = DEFAULT_QUALITY
 ): Promise<{ dataUrl: string; jsPdfFormat: string; width: number; height: number }> {
-  const srcDataUrl = item.previewUrl || item.optimizedDataUrl || '';
   const origWidth = item.width || 1;
   const origHeight = item.height || 1;
 
+  // Obtain source Data URL or load on-demand if item.file is provided and previewUrl is missing
+  let srcDataUrl = item.previewUrl || item.optimizedDataUrl || '';
+  if (!srcDataUrl && item.file) {
+    try {
+      srcDataUrl = await readFileAsDataUrl(item.file);
+    } catch {
+      srcDataUrl = '';
+    }
+  }
+
   // Determine source MIME type
-  let srcType = (item.type || '').toLowerCase();
+  let srcType = (item.type || item.file?.type || '').toLowerCase();
   if (!srcType && srcDataUrl) {
     if (srcDataUrl.startsWith('data:image/png')) srcType = 'image/png';
     else if (srcDataUrl.startsWith('data:image/webp')) srcType = 'image/webp';
@@ -172,13 +254,38 @@ export async function processImageForPdf(
       return;
     }
 
+    let imageSrc = srcDataUrl;
+    let objectUrlToRevoke = '';
+
+    if (item.file && typeof window !== 'undefined' && window.URL && typeof window.URL.createObjectURL === 'function') {
+      try {
+        objectUrlToRevoke = URL.createObjectURL(item.file);
+        imageSrc = objectUrlToRevoke;
+      } catch {
+        imageSrc = srcDataUrl;
+      }
+    }
+
     const img = new Image();
     img.crossOrigin = 'anonymous';
 
     let settled = false;
-    const finish = (res: { dataUrl: string; jsPdfFormat: string; width: number; height: number }) => {
+    const cleanupObjectUrl = () => {
+      if (objectUrlToRevoke) {
+        try {
+          URL.revokeObjectURL(objectUrlToRevoke);
+        } catch {}
+      }
+    };
+
+    const finish = (res: { dataUrl: string; jsPdfFormat: string; width: number; height: number }, canvasToClean?: HTMLCanvasElement) => {
       if (!settled) {
         settled = true;
+        if (canvasToClean) {
+          canvasToClean.width = 0;
+          canvasToClean.height = 0;
+        }
+        cleanupObjectUrl();
         resolve(res);
       }
     };
@@ -192,7 +299,7 @@ export async function processImageForPdf(
         width: origWidth,
         height: origHeight,
       });
-    }, 300);
+    }, 500);
 
     img.onload = () => {
       clearTimeout(timer);
@@ -210,7 +317,7 @@ export async function processImageForPdf(
           jsPdfFormat: targetFormat === 'PNG' ? 'PNG' : 'JPEG',
           width: naturalW,
           height: naturalH,
-        });
+        }, canvas);
         return;
       }
 
@@ -255,7 +362,7 @@ export async function processImageForPdf(
         jsPdfFormat,
         width: naturalW,
         height: naturalH,
-      });
+      }, canvas);
     };
 
     img.onerror = () => {
@@ -268,6 +375,6 @@ export async function processImageForPdf(
       });
     };
 
-    img.src = srcDataUrl;
+    img.src = imageSrc;
   });
 }
