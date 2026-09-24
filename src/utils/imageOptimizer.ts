@@ -40,6 +40,80 @@ export function formatFileSize(bytes: number): string {
 }
 
 /**
+ * Helper to convert a File to a Data URL on demand.
+ */
+export function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve((reader.result as string) || '');
+    reader.onerror = () => reject(new Error('Failed to read file as Data URL.'));
+    reader.readAsDataURL(file);
+  });
+}
+
+/**
+ * Reads image natural dimensions from a File object using object URL without base64 conversion.
+ */
+export function getImageDimensionsFromFile(file: File): Promise<{ width: number; height: number }> {
+  return new Promise((resolve) => {
+    if (typeof window === 'undefined' || !window.URL || typeof window.URL.createObjectURL !== 'function') {
+      resolve({ width: 1000, height: 1000 });
+      return;
+    }
+
+    let objectUrl = '';
+    try {
+      objectUrl = URL.createObjectURL(file);
+    } catch {
+      resolve({ width: 1000, height: 1000 });
+      return;
+    }
+
+    const img = new Image();
+    let settled = false;
+
+    const cleanup = () => {
+      try {
+        img.src = '';
+        if (objectUrl) URL.revokeObjectURL(objectUrl);
+      } catch {
+        // ignore
+      }
+    };
+
+    const timer = setTimeout(() => {
+      if (!settled) {
+        settled = true;
+        cleanup();
+        resolve({ width: 1000, height: 1000 });
+      }
+    }, 300);
+
+    img.onload = () => {
+      if (!settled) {
+        settled = true;
+        clearTimeout(timer);
+        const w = img.naturalWidth || img.width || 1000;
+        const h = img.naturalHeight || img.height || 1000;
+        cleanup();
+        resolve({ width: w, height: h });
+      }
+    };
+
+    img.onerror = () => {
+      if (!settled) {
+        settled = true;
+        clearTimeout(timer);
+        cleanup();
+        resolve({ width: 1000, height: 1000 });
+      }
+    };
+
+    img.src = objectUrl;
+  });
+}
+
+/**
  * Reads an image File and returns image dimensions and preview data URL.
  */
 export function readImageData(file: File): Promise<{ previewUrl: string; width: number; height: number }> {
@@ -119,12 +193,12 @@ export async function processImageForPdf(
   targetFormat: OutputFormat | 'WEBP' = 'JPG',
   quality: number = DEFAULT_QUALITY
 ): Promise<{ dataUrl: string; jsPdfFormat: string; width: number; height: number }> {
-  const srcDataUrl = item.previewUrl || item.optimizedDataUrl || '';
+  let srcDataUrl = item.previewUrl || item.optimizedDataUrl || '';
   const origWidth = item.width || 1;
   const origHeight = item.height || 1;
 
   // Determine source MIME type
-  let srcType = (item.type || '').toLowerCase();
+  let srcType = (item.type || item.file?.type || '').toLowerCase();
   if (!srcType && srcDataUrl) {
     if (srcDataUrl.startsWith('data:image/png')) srcType = 'image/png';
     else if (srcDataUrl.startsWith('data:image/webp')) srcType = 'image/webp';
@@ -134,8 +208,11 @@ export async function processImageForPdf(
   // Handle PNG:
   // For PNG output:
   // - Keep PNG as PNG and lossless.
-  // - If source is already PNG, return original dataUrl directly without re-encoding to preserve exact quality and avoid overhead.
+  // - If source is PNG, return original dataUrl directly without re-encoding.
   if (targetFormat === 'PNG' && srcType.includes('png')) {
+    if (!srcDataUrl && item.file) {
+      srcDataUrl = await readFileAsDataUrl(item.file);
+    }
     return {
       dataUrl: srcDataUrl,
       jsPdfFormat: 'PNG',
@@ -149,6 +226,9 @@ export async function processImageForPdf(
   // Optimization for JPEG source -> JPG output:
   // If quality is 1.0 (100%), embed original JPEG directly without canvas re-encoding bloat.
   if (targetFormat === 'JPG' && isJpegSource && quality >= 0.99) {
+    if (!srcDataUrl && item.file) {
+      srcDataUrl = await readFileAsDataUrl(item.file);
+    }
     return {
       dataUrl: srcDataUrl,
       jsPdfFormat: 'JPEG',
@@ -158,10 +238,16 @@ export async function processImageForPdf(
   }
 
   // For canvas processing (JPG, or PNG conversion from non-PNG inputs):
-  return new Promise((resolve) => {
-    // In node/jsdom test environments without full canvas/Image rendering engine, HTMLImageElement onload may not fire for inline base64 images.
-    // If document/window canvas context is not present or in test mock environment, return source/fallback directly.
+  return new Promise(async (resolve) => {
+    // In node/jsdom test environments without full canvas/Image rendering engine, return source/fallback directly.
     if (typeof document === 'undefined' || typeof HTMLCanvasElement === 'undefined') {
+      if (!srcDataUrl && item.file) {
+        try {
+          srcDataUrl = await readFileAsDataUrl(item.file);
+        } catch {
+          // fallback
+        }
+      }
       const fallbackFormat = targetFormat === 'PNG' ? 'PNG' : 'JPEG';
       resolve({
         dataUrl: srcDataUrl,
@@ -172,6 +258,30 @@ export async function processImageForPdf(
       return;
     }
 
+    let tempObjectUrl = '';
+    let imgSrc = srcDataUrl;
+
+    if (!imgSrc && item.file && typeof window !== 'undefined' && typeof window.URL?.createObjectURL === 'function') {
+      try {
+        tempObjectUrl = URL.createObjectURL(item.file);
+        imgSrc = tempObjectUrl;
+      } catch {
+        try {
+          srcDataUrl = await readFileAsDataUrl(item.file);
+          imgSrc = srcDataUrl;
+        } catch {
+          // ignore
+        }
+      }
+    } else if (!imgSrc && item.file) {
+      try {
+        srcDataUrl = await readFileAsDataUrl(item.file);
+        imgSrc = srcDataUrl;
+      } catch {
+        // ignore
+      }
+    }
+
     const img = new Image();
     img.crossOrigin = 'anonymous';
 
@@ -179,13 +289,28 @@ export async function processImageForPdf(
     const finish = (res: { dataUrl: string; jsPdfFormat: string; width: number; height: number }) => {
       if (!settled) {
         settled = true;
+        try {
+          img.src = '';
+          if (tempObjectUrl) {
+            URL.revokeObjectURL(tempObjectUrl);
+          }
+        } catch {
+          // ignore
+        }
         resolve(res);
       }
     };
 
     // Timeout safety for environments where Image onload does not trigger
-    const timer = setTimeout(() => {
+    const timer = setTimeout(async () => {
       const jsPdfFormat = targetFormat === 'PNG' ? 'PNG' : 'JPEG';
+      if (!srcDataUrl && item.file) {
+        try {
+          srcDataUrl = await readFileAsDataUrl(item.file);
+        } catch {
+          // fallback
+        }
+      }
       finish({
         dataUrl: srcDataUrl,
         jsPdfFormat,
@@ -194,7 +319,7 @@ export async function processImageForPdf(
       });
     }, 300);
 
-    img.onload = () => {
+    img.onload = async () => {
       clearTimeout(timer);
       const naturalW = img.naturalWidth || origWidth;
       const naturalH = img.naturalHeight || origHeight;
@@ -205,6 +330,13 @@ export async function processImageForPdf(
 
       const ctx = canvas.getContext('2d');
       if (!ctx) {
+        if (!srcDataUrl && item.file) {
+          try {
+            srcDataUrl = await readFileAsDataUrl(item.file);
+          } catch {
+            // fallback
+          }
+        }
         finish({
           dataUrl: srcDataUrl,
           jsPdfFormat: targetFormat === 'PNG' ? 'PNG' : 'JPEG',
@@ -241,11 +373,22 @@ export async function processImageForPdf(
 
       const encodedDataUrl = canvas.toDataURL(mimeType, clampedQuality);
 
+      // Explicitly release canvas buffer memory
+      canvas.width = 0;
+      canvas.height = 0;
+
       // If encoding JPEG source to JPG, check if canvas re-encoding bloated the payload size.
       // If canvas output is larger or equal in size to original JPEG data URL, prefer original data URL.
       let finalDataUrl = encodedDataUrl;
-      if (targetFormat === 'JPG' && isJpegSource && srcDataUrl) {
-        if (encodedDataUrl.length >= srcDataUrl.length) {
+      if (targetFormat === 'JPG' && isJpegSource) {
+        if (!srcDataUrl && item.file) {
+          try {
+            srcDataUrl = await readFileAsDataUrl(item.file);
+          } catch {
+            // fallback
+          }
+        }
+        if (srcDataUrl && encodedDataUrl.length >= srcDataUrl.length) {
           finalDataUrl = srcDataUrl;
         }
       }
@@ -258,8 +401,15 @@ export async function processImageForPdf(
       });
     };
 
-    img.onerror = () => {
+    img.onerror = async () => {
       clearTimeout(timer);
+      if (!srcDataUrl && item.file) {
+        try {
+          srcDataUrl = await readFileAsDataUrl(item.file);
+        } catch {
+          // fallback
+        }
+      }
       finish({
         dataUrl: srcDataUrl,
         jsPdfFormat: targetFormat === 'PNG' ? 'PNG' : 'JPEG',
@@ -268,6 +418,6 @@ export async function processImageForPdf(
       });
     };
 
-    img.src = srcDataUrl;
+    img.src = imgSrc;
   });
 }

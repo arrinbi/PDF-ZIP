@@ -8,7 +8,7 @@ import type {
   PdfOptions,
   ZipOptions,
 } from '../types';
-import { readImageData } from './imageOptimizer';
+import { getImageDimensionsFromFile } from './imageOptimizer';
 import { generatePdfFromImages } from './pdfGenerator';
 import { generateZipFromImages } from './zipGenerator';
 
@@ -124,17 +124,15 @@ export async function createBatchFolderFromFiles(files: File[], customFolderName
   const imageItems: ImageItem[] = [];
   for (const file of sortedFiles) {
     const id = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
-    let previewUrl = '';
     let width = 1000;
     let height = 1000;
 
     try {
-      const imgData = await readImageData(file);
-      previewUrl = imgData.previewUrl;
-      width = imgData.width;
-      height = imgData.height;
+      const dims = await getImageDimensionsFromFile(file);
+      width = dims.width;
+      height = dims.height;
     } catch {
-      // Fallback if image data reader fails (e.g., in headless test env)
+      // Fallback if image dimension reader fails
     }
 
     imageItems.push({
@@ -143,7 +141,7 @@ export async function createBatchFolderFromFiles(files: File[], customFolderName
       name: file.name,
       size: file.size,
       type: file.type || 'image/jpeg',
-      previewUrl,
+      previewUrl: '', // Efficient: do not pre-load base64 Data URLs for batch processing
       width,
       height,
       status: 'idle',

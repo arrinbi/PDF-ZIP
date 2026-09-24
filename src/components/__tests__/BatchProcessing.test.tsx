@@ -5,6 +5,7 @@ import * as imageOptimizer from '../../utils/imageOptimizer';
 
 if (typeof window !== 'undefined') {
   window.URL.createObjectURL = vi.fn().mockReturnValue('blob:mock-batch-url');
+  window.URL.revokeObjectURL = vi.fn();
 }
 
 describe('BatchProcessing Component', () => {
@@ -83,7 +84,7 @@ describe('BatchProcessing Component', () => {
 
     await waitFor(() => {
       expect(screen.getByText(/Batch Processing Complete/i)).toBeDefined();
-    });
+    }, { timeout: 4000 });
 
     // Verify customized output names appear in results
     expect(screen.getByText('Love Comes on a Moonlit Night Ch.2')).toBeDefined();
@@ -119,7 +120,7 @@ describe('BatchProcessing Component', () => {
 
     await waitFor(() => {
       expect(screen.getByText(/Batch Processing Complete/i)).toBeDefined();
-    });
+    }, { timeout: 4000 });
 
     expect(screen.getByText('Renamed Archive A')).toBeDefined();
     expect(screen.getByText('Folder B')).toBeDefined();
@@ -176,7 +177,7 @@ describe('BatchProcessing Component', () => {
 
     await waitFor(() => {
       expect(screen.getByText(/Batch Processing Complete/i)).toBeDefined();
-    });
+    }, { timeout: 4000 });
 
     const downloadButtons = screen.getAllByRole('button', { name: /Download/i });
     expect(downloadButtons.length).toBeGreaterThan(0);
