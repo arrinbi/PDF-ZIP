@@ -24,7 +24,7 @@ describe('App Component', () => {
     expect(screen.getByText(/Original Quality ZIP/i)).toBeDefined();
   });
 
-  it('renders export mode selector when images are uploaded', async () => {
+  it('renders export options when images are uploaded', async () => {
     render(<App />);
 
     const file1 = new File(['fake image data 1'], 'photo123.jpg', { type: 'image/jpeg' });
@@ -35,29 +35,21 @@ describe('App Component', () => {
     }
 
     await waitFor(() => {
-      expect(screen.getByText(/Export Options/i)).toBeDefined();
+      expect(screen.getByText(/PDF Options/i)).toBeDefined();
       expect(screen.getByText(/Create PDF \(1\)/i)).toBeDefined();
     });
 
-    // Check PDF-only options are visible
-    expect(screen.getByText(/Page Margin/i)).toBeDefined();
-    expect(screen.getByText(/Image Output & Compression/i)).toBeDefined();
-
-    // Switch to ZIP export mode
+    // Switch to ZIP export mode via main navigation
     const zipButton = screen.getByRole('button', { name: /ZIP/i });
     fireEvent.click(zipButton);
 
     await waitFor(() => {
       expect(screen.getByText(/Export ZIP \(1\)/i)).toBeDefined();
-      expect(screen.getByText(/ZIP Archive Name/i)).toBeDefined();
+      expect(screen.getByText(/ZIP Document Name/i)).toBeDefined();
     });
 
-    // Verify PDF-only options are hidden in ZIP mode
-    expect(screen.queryByText(/Page Margin/i)).toBeNull();
-    expect(screen.queryByText(/Image Output & Compression/i)).toBeNull();
-
     // Verify ZIP Format options exist
-    expect(screen.getByText(/ZIP Format & Quality/i)).toBeDefined();
+    expect(screen.getByText(/ZIP Options/i)).toBeDefined();
     expect(screen.getByRole('button', { name: 'Original' })).toBeDefined();
     expect(screen.getByRole('button', { name: 'JPG' })).toBeDefined();
     expect(screen.getByRole('button', { name: 'PNG' })).toBeDefined();
@@ -75,32 +67,32 @@ describe('App Component', () => {
     }
 
     await waitFor(() => {
-      expect(screen.getByText(/Export Options/i)).toBeDefined();
+      expect(screen.getByText(/PDF Options/i)).toBeDefined();
     });
 
     // Switch to ZIP export mode
     const zipModeButton = screen.getByRole('button', { name: /ZIP/i });
     fireEvent.click(zipModeButton);
 
-    const qualityRange = screen.getByRole('slider') as HTMLInputElement;
+    const qualitySelect = screen.getByRole('combobox') as HTMLSelectElement;
 
-    // Default ZIP mode is Original -> quality slider disabled
-    expect(qualityRange.disabled).toBe(true);
+    // Default ZIP mode is Original -> quality dropdown disabled
+    expect(qualitySelect.disabled).toBe(true);
 
     // Click JPG format
     const jpgBtn = screen.getByRole('button', { name: 'JPG' });
     fireEvent.click(jpgBtn);
-    expect(qualityRange.disabled).toBe(false);
+    expect(qualitySelect.disabled).toBe(false);
 
     // Click PNG format
     const pngBtn = screen.getByRole('button', { name: 'PNG' });
     fireEvent.click(pngBtn);
-    expect(qualityRange.disabled).toBe(true);
+    expect(qualitySelect.disabled).toBe(true);
 
     // Click WEBP format
     const webpBtn = screen.getByRole('button', { name: 'WEBP' });
     fireEvent.click(webpBtn);
-    expect(qualityRange.disabled).toBe(false);
+    expect(qualitySelect.disabled).toBe(false);
   });
 
   it('generates ZIP export when in ZIP mode and export button is clicked', async () => {

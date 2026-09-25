@@ -96,7 +96,7 @@ describe('BatchProcessing Component', () => {
       createWebkitFile('01.jpg', 'Manga/Folder B/01.jpg'),
     ];
 
-    render(<BatchProcessing />);
+    render(<BatchProcessing exportMode="zip" />);
 
     const input = document.querySelector('input[type="file"]') as HTMLInputElement;
     fireEvent.change(input, { target: { files } });
@@ -104,10 +104,6 @@ describe('BatchProcessing Component', () => {
     await waitFor(() => {
       expect(screen.getByDisplayValue('Folder A')).toBeDefined();
     });
-
-    // Switch output mode to ZIP
-    const zipButton = screen.getByRole('button', { name: /ZIP/i });
-    fireEvent.click(zipButton);
 
     // Change output name for Folder A
     const inputFieldA = screen.getByDisplayValue('Folder A');

@@ -29,10 +29,10 @@ import {
 } from 'lucide-react';
 
 interface BatchProcessingProps {
-  onBackToSingle?: () => void;
+  exportMode?: ExportMode;
 }
 
-export const BatchProcessing: React.FC<BatchProcessingProps> = () => {
+export const BatchProcessing: React.FC<BatchProcessingProps> = ({ exportMode = 'pdf' }) => {
   const [parentFolderName, setParentFolderName] = useState<string>('');
   const [discoveredSubfolders, setDiscoveredSubfolders] = useState<DiscoveredSubfolder[]>([]);
   const [selectedFolderIds, setSelectedFolderIds] = useState<Set<string>>(new Set());
@@ -40,8 +40,6 @@ export const BatchProcessing: React.FC<BatchProcessingProps> = () => {
   // Mapping subfolder ID -> customized output filename
   const [customOutputNames, setCustomOutputNames] = useState<Record<string, string>>({});
 
-  const [exportMode, setExportMode] = useState<ExportMode>('pdf');
-  const [margin, setMargin] = useState<number>(0);
   const [outputFormat, setOutputFormat] = useState<OutputFormat>('JPG');
   const [zipOutputFormat, setZipOutputFormat] = useState<ZipOutputFormat>('ORIGINAL');
   const [quality, setQuality] = useState<number>(0.85);
@@ -194,7 +192,7 @@ export const BatchProcessing: React.FC<BatchProcessingProps> = () => {
             batchFolder,
             exportMode,
             {
-              pdfOptions: { margin, outputFormat, quality },
+              pdfOptions: { margin: 0, outputFormat, quality },
               zipOptions: { outputFormat: zipOutputFormat, quality },
             },
             (curr, tot) => {
@@ -249,6 +247,8 @@ export const BatchProcessing: React.FC<BatchProcessingProps> = () => {
   const totalSelectedImages = discoveredSubfolders
     .filter((sf) => selectedFolderIds.has(sf.id))
     .reduce((sum, sf) => sum + sf.imageCount, 0);
+
+  const qualityOptions = [0.80, 0.85, 0.90, 0.95, 1.00];
 
   return (
     <div className="space-y-6">
@@ -443,62 +443,15 @@ export const BatchProcessing: React.FC<BatchProcessingProps> = () => {
               </div>
             </div>
 
-            {/* Export Mode & Quality Settings */}
+            {/* Export Mode Settings */}
             <div className="space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                <div className="flex items-center gap-2 text-slate-800 font-semibold text-xs">
-                  <Sliders className="w-4 h-4 text-indigo-600" />
-                  <span>Output Settings</span>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-medium text-slate-500">Output mode:</span>
-                  <div className="inline-flex p-1 bg-slate-100 rounded-xl border border-slate-200">
-                    <button
-                      type="button"
-                      onClick={() => setExportMode('pdf')}
-                      className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
-                        exportMode === 'pdf'
-                          ? 'bg-white text-indigo-700 shadow-xs'
-                          : 'text-slate-600 hover:text-slate-900'
-                      }`}
-                    >
-                      <FileText className="w-3.5 h-3.5" />
-                      <span>PDF</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setExportMode('zip')}
-                      className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
-                        exportMode === 'zip'
-                          ? 'bg-white text-indigo-700 shadow-xs'
-                          : 'text-slate-600 hover:text-slate-900'
-                      }`}
-                    >
-                      <Archive className="w-3.5 h-3.5" />
-                      <span>ZIP</span>
-                    </button>
-                  </div>
-                </div>
+              <div className="flex items-center gap-2 text-slate-800 font-semibold text-xs border-b border-slate-100 pb-2">
+                <Sliders className="w-4 h-4 text-indigo-600" />
+                <span>Batch {exportMode.toUpperCase()} Settings</span>
               </div>
 
               {exportMode === 'pdf' ? (
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
-                  <div>
-                    <label className="block text-xs font-medium text-slate-600 mb-1">
-                      Page Margin
-                    </label>
-                    <select
-                      value={margin}
-                      onChange={(e) => setMargin(Number(e.target.value))}
-                      className="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-xs bg-white focus:ring-2 focus:ring-indigo-500 outline-hidden"
-                    >
-                      <option value={0}>No Margin (Full Bleed)</option>
-                      <option value={5}>Small (5mm)</option>
-                      <option value={10}>Standard (10mm)</option>
-                    </select>
-                  </div>
-
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                   <div>
                     <label className="block text-xs font-medium text-slate-600 mb-1">
                       Image Output
@@ -522,29 +475,28 @@ export const BatchProcessing: React.FC<BatchProcessingProps> = () => {
                   </div>
 
                   <div>
-                    <div className="flex justify-between items-center mb-1">
-                      <label className="block text-xs font-medium text-slate-600">Quality</label>
-                      <span className="text-xs font-bold text-indigo-600">{Math.round(quality * 100)}%</span>
-                    </div>
-                    <input
-                      type="range"
-                      min="0.80"
-                      max="1.00"
-                      step="0.05"
+                    <label className="block text-xs font-medium text-slate-600 mb-1">Quality</label>
+                    <select
                       value={quality}
                       onChange={(e) => setQuality(parseFloat(e.target.value))}
                       disabled={outputFormat === 'PNG'}
-                      className={`w-full accent-indigo-600 ${
-                        outputFormat === 'PNG' ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
+                      className={`w-full px-3 py-1.5 border border-slate-300 rounded-lg text-xs focus:ring-2 focus:ring-indigo-500 outline-hidden ${
+                        outputFormat === 'PNG' ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-white text-slate-800'
                       }`}
-                    />
+                    >
+                      {qualityOptions.map((q) => (
+                        <option key={q} value={q}>
+                          {Math.round(q * 100)}%
+                        </option>
+                      ))}
+                    </select>
                   </div>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                   <div>
                     <label className="block text-xs font-medium text-slate-600 mb-1">
-                      ZIP Format
+                      Image Output
                     </label>
                     <div className="grid grid-cols-4 gap-1.5">
                       {(['ORIGINAL', 'JPG', 'PNG', 'WEBP'] as ZipOutputFormat[]).map((fmt) => (
@@ -565,24 +517,23 @@ export const BatchProcessing: React.FC<BatchProcessingProps> = () => {
                   </div>
 
                   <div>
-                    <div className="flex justify-between items-center mb-1">
-                      <label className="block text-xs font-medium text-slate-600">Quality</label>
-                      <span className="text-xs font-bold text-indigo-600">{Math.round(quality * 100)}%</span>
-                    </div>
-                    <input
-                      type="range"
-                      min="0.80"
-                      max="1.00"
-                      step="0.05"
+                    <label className="block text-xs font-medium text-slate-600 mb-1">Quality</label>
+                    <select
                       value={quality}
                       onChange={(e) => setQuality(parseFloat(e.target.value))}
                       disabled={zipOutputFormat === 'ORIGINAL' || zipOutputFormat === 'PNG'}
-                      className={`w-full accent-indigo-600 ${
+                      className={`w-full px-3 py-1.5 border border-slate-300 rounded-lg text-xs focus:ring-2 focus:ring-indigo-500 outline-hidden ${
                         zipOutputFormat === 'ORIGINAL' || zipOutputFormat === 'PNG'
-                          ? 'opacity-50 cursor-not-allowed'
-                          : 'cursor-pointer'
+                          ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                          : 'bg-white text-slate-800'
                       }`}
-                    />
+                    >
+                      {qualityOptions.map((q) => (
+                        <option key={q} value={q}>
+                          {Math.round(q * 100)}%
+                        </option>
+                      ))}
+                    </select>
                   </div>
                 </div>
               )}
