@@ -1,6 +1,6 @@
 import type { ImageItem, OptimizationOptions, OutputFormat } from '../types';
 
-export const DEFAULT_MAX_DIMENSION = 8192; // Max dimension reference
+export const DEFAULT_MAX_DIMENSION = 2400; // Max dimension reference (2400px max dimension optimization)
 export const DEFAULT_QUALITY = 0.85; // Default 85% image quality
 
 /**
@@ -185,12 +185,14 @@ export async function optimizeSingleImage(
 
 /**
  * Processes an image for PDF embedding according to user-selected format and quality settings.
- * Preserves exact natural dimensions without downscaling, upscaling, or cropping.
+ * Downscales images whose maximum dimension exceeds 2400px to a maximum dimension of 2400px
+ * while preserving aspect ratio and without stretching or cropping. Images <= 2400px are not enlarged.
  */
 export async function processImageForPdf(
   item: ImageItem,
   targetFormat: OutputFormat | 'WEBP' = 'JPG',
-  quality: number = DEFAULT_QUALITY
+  quality: number = DEFAULT_QUALITY,
+  maxDimension: number = DEFAULT_MAX_DIMENSION
 ): Promise<{ dataUrl: string; jsPdfFormat: string; width: number; height: number }> {
   const origWidth = item.width || 1;
   const origHeight = item.height || 1;
@@ -213,11 +215,14 @@ export async function processImageForPdf(
     else if (srcDataUrl.startsWith('data:image/jpeg') || srcDataUrl.startsWith('data:image/jpg')) srcType = 'image/jpeg';
   }
 
+  const maxOriginal = Math.max(origWidth, origHeight);
+  const needsResizing = maxOriginal > maxDimension;
+
   // Handle PNG:
   // For PNG output:
   // - Keep PNG as PNG and lossless.
-  // - If source is already PNG, return original dataUrl directly without re-encoding to preserve exact quality and avoid overhead.
-  if (targetFormat === 'PNG' && srcType.includes('png')) {
+  // - If source is already PNG and does NOT need downscaling, return original dataUrl directly to preserve exact quality and avoid overhead.
+  if (targetFormat === 'PNG' && srcType.includes('png') && !needsResizing) {
     return {
       dataUrl: srcDataUrl,
       jsPdfFormat: 'PNG',
@@ -229,8 +234,8 @@ export async function processImageForPdf(
   const isJpegSource = srcType.includes('jpeg') || srcType.includes('jpg');
 
   // Optimization for JPEG source -> JPG output:
-  // If quality is 1.0 (100%), embed original JPEG directly without canvas re-encoding bloat.
-  if (targetFormat === 'JPG' && isJpegSource && quality >= 0.99) {
+  // If quality is 1.0 (100%) and does NOT need downscaling, embed original JPEG directly without canvas re-encoding bloat.
+  if (targetFormat === 'JPG' && isJpegSource && quality >= 0.99 && !needsResizing) {
     return {
       dataUrl: srcDataUrl,
       jsPdfFormat: 'JPEG',
@@ -239,17 +244,18 @@ export async function processImageForPdf(
     };
   }
 
-  // For canvas processing (JPG, or PNG conversion from non-PNG inputs):
+  // For canvas processing (JPG, PNG conversion from non-PNG inputs, or downscaling > 2400px):
   return new Promise((resolve) => {
     // In node/jsdom test environments without full canvas/Image rendering engine, HTMLImageElement onload may not fire for inline base64 images.
-    // If document/window canvas context is not present or in test mock environment, return source/fallback directly.
+    // If document/window canvas context is not present or in test mock environment, return source/fallback directly with target dimensions.
     if (typeof document === 'undefined' || typeof HTMLCanvasElement === 'undefined') {
       const fallbackFormat = targetFormat === 'PNG' ? 'PNG' : 'JPEG';
+      const targetDims = calculateTargetDimensions(origWidth, origHeight, maxDimension);
       resolve({
         dataUrl: srcDataUrl,
         jsPdfFormat: fallbackFormat,
-        width: origWidth,
-        height: origHeight,
+        width: targetDims.width,
+        height: targetDims.height,
       });
       return;
     }
@@ -293,11 +299,12 @@ export async function processImageForPdf(
     // Timeout safety for environments where Image onload does not trigger
     const timer = setTimeout(() => {
       const jsPdfFormat = targetFormat === 'PNG' ? 'PNG' : 'JPEG';
+      const targetDims = calculateTargetDimensions(origWidth, origHeight, maxDimension);
       finish({
         dataUrl: srcDataUrl,
         jsPdfFormat,
-        width: origWidth,
-        height: origHeight,
+        width: targetDims.width,
+        height: targetDims.height,
       });
     }, 500);
 
@@ -306,17 +313,19 @@ export async function processImageForPdf(
       const naturalW = img.naturalWidth || origWidth;
       const naturalH = img.naturalHeight || origHeight;
 
+      const targetDims = calculateTargetDimensions(naturalW, naturalH, maxDimension);
+
       const canvas = document.createElement('canvas');
-      canvas.width = naturalW;
-      canvas.height = naturalH;
+      canvas.width = targetDims.width;
+      canvas.height = targetDims.height;
 
       const ctx = canvas.getContext('2d');
       if (!ctx) {
         finish({
           dataUrl: srcDataUrl,
           jsPdfFormat: targetFormat === 'PNG' ? 'PNG' : 'JPEG',
-          width: naturalW,
-          height: naturalH,
+          width: targetDims.width,
+          height: targetDims.height,
         }, canvas);
         return;
       }
@@ -324,10 +333,10 @@ export async function processImageForPdf(
       // If encoding to JPEG, fill white background for transparent PNG/WEBP inputs
       if (targetFormat === 'JPG') {
         ctx.fillStyle = '#FFFFFF';
-        ctx.fillRect(0, 0, naturalW, naturalH);
+        ctx.fillRect(0, 0, targetDims.width, targetDims.height);
       }
 
-      ctx.drawImage(img, 0, 0, naturalW, naturalH);
+      ctx.drawImage(img, 0, 0, targetDims.width, targetDims.height);
 
       let mimeType = 'image/jpeg';
       let jsPdfFormat = 'JPEG';
@@ -349,9 +358,10 @@ export async function processImageForPdf(
       const encodedDataUrl = canvas.toDataURL(mimeType, clampedQuality);
 
       // If encoding JPEG source to JPG, check if canvas re-encoding bloated the payload size.
-      // If canvas output is larger or equal in size to original JPEG data URL, prefer original data URL.
+      // If image was NOT downscaled, and canvas output is larger or equal in size to original JPEG data URL, prefer original data URL.
       let finalDataUrl = encodedDataUrl;
-      if (targetFormat === 'JPG' && isJpegSource && srcDataUrl) {
+      const isResized = targetDims.width !== naturalW || targetDims.height !== naturalH;
+      if (targetFormat === 'JPG' && isJpegSource && srcDataUrl && !isResized) {
         if (encodedDataUrl.length >= srcDataUrl.length) {
           finalDataUrl = srcDataUrl;
         }
@@ -360,18 +370,19 @@ export async function processImageForPdf(
       finish({
         dataUrl: finalDataUrl,
         jsPdfFormat,
-        width: naturalW,
-        height: naturalH,
+        width: targetDims.width,
+        height: targetDims.height,
       }, canvas);
     };
 
     img.onerror = () => {
       clearTimeout(timer);
+      const targetDims = calculateTargetDimensions(origWidth, origHeight, maxDimension);
       finish({
         dataUrl: srcDataUrl,
         jsPdfFormat: targetFormat === 'PNG' ? 'PNG' : 'JPEG',
-        width: origWidth,
-        height: origHeight,
+        width: targetDims.width,
+        height: targetDims.height,
       });
     };
 
