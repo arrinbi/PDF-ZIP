@@ -1,10 +1,11 @@
 import type { ImageItem, OptimizationOptions, OutputFormat } from '../types';
 
-export const DEFAULT_MAX_DIMENSION = 2400; // Max dimension reference (2400px max dimension optimization)
+export const DEFAULT_MAX_DIMENSION = Infinity; // Preserves full original image pixel dimensions by default
 export const DEFAULT_QUALITY = 0.85; // Default 85% image quality
 
 /**
  * Calculates new width and height respecting max dimension and maintaining aspect ratio.
+ * If maxDimension is Infinity, non-positive, or unconstrained, original dimensions are preserved.
  */
 export function calculateTargetDimensions(
   origWidth: number,
@@ -13,6 +14,10 @@ export function calculateTargetDimensions(
 ): { width: number; height: number } {
   if (origWidth <= 0 || origHeight <= 0) {
     return { width: Math.max(1, origWidth), height: Math.max(1, origHeight) };
+  }
+
+  if (!maxDimension || maxDimension <= 0 || !Number.isFinite(maxDimension)) {
+    return { width: origWidth, height: origHeight };
   }
 
   const maxOriginal = Math.max(origWidth, origHeight);
@@ -185,8 +190,7 @@ export async function optimizeSingleImage(
 
 /**
  * Processes an image for PDF embedding according to user-selected format and quality settings.
- * Downscales images whose maximum dimension exceeds 2400px to a maximum dimension of 2400px
- * while preserving aspect ratio and without stretching or cropping. Images <= 2400px are not enlarged.
+ * Preserves original image pixel dimensions by default without unnecessary downscaling or enlargement.
  */
 export async function processImageForPdf(
   item: ImageItem,
@@ -216,7 +220,7 @@ export async function processImageForPdf(
   }
 
   const maxOriginal = Math.max(origWidth, origHeight);
-  const needsResizing = maxOriginal > maxDimension;
+  const needsResizing = Number.isFinite(maxDimension) && maxOriginal > maxDimension;
 
   // Handle PNG:
   // For PNG output:
@@ -244,7 +248,7 @@ export async function processImageForPdf(
     };
   }
 
-  // For canvas processing (JPG, PNG conversion from non-PNG inputs, or downscaling > 2400px):
+  // For canvas processing (JPG, PNG conversion from non-PNG inputs, or optional downscaling):
   return new Promise((resolve) => {
     // In node/jsdom test environments without full canvas/Image rendering engine, HTMLImageElement onload may not fire for inline base64 images.
     // If document/window canvas context is not present or in test mock environment, return source/fallback directly with target dimensions.

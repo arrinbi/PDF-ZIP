@@ -12,11 +12,16 @@ import type { ImageItem } from '../../types';
 describe('imageOptimizer utilities', () => {
   it('uses expected default quality and max dimension constants', () => {
     expect(DEFAULT_QUALITY).toBe(0.85);
-    expect(DEFAULT_MAX_DIMENSION).toBe(2400);
+    expect(DEFAULT_MAX_DIMENSION).toBe(Infinity);
   });
 
   describe('calculateTargetDimensions', () => {
-    it('1. Image below 2400px is not enlarged', () => {
+    it('1. Preserves full dimensions when maxDimension is Infinity by default', () => {
+      const result = calculateTargetDimensions(3600, 2700);
+      expect(result).toEqual({ width: 3600, height: 2700 });
+    });
+
+    it('2. Image below maxDimension is not enlarged', () => {
       const resultLandscape = calculateTargetDimensions(1200, 800, 2400);
       expect(resultLandscape).toEqual({ width: 1200, height: 800 });
 
@@ -24,7 +29,7 @@ describe('imageOptimizer utilities', () => {
       expect(resultPortrait).toEqual({ width: 800, height: 1600 });
     });
 
-    it('2. Image exactly 2400px is unchanged', () => {
+    it('3. Image exactly maxDimension is unchanged', () => {
       const resultLandscape = calculateTargetDimensions(2400, 1800, 2400);
       expect(resultLandscape).toEqual({ width: 2400, height: 1800 });
 
@@ -35,25 +40,25 @@ describe('imageOptimizer utilities', () => {
       expect(resultSquare).toEqual({ width: 2400, height: 2400 });
     });
 
-    it('3. Landscape image preserves aspect ratio', () => {
+    it('4. Landscape image preserves aspect ratio when maxDimension is specified', () => {
       const result = calculateTargetDimensions(4800, 2400, 2400);
       expect(result).toEqual({ width: 2400, height: 1200 });
       expect(result.width / result.height).toBeCloseTo(4800 / 2400);
     });
 
-    it('4. Portrait image preserves aspect ratio', () => {
+    it('5. Portrait image preserves aspect ratio when maxDimension is specified', () => {
       const result = calculateTargetDimensions(3000, 4000, 2400);
       expect(result).toEqual({ width: 1800, height: 2400 });
       expect(result.width / result.height).toBeCloseTo(3000 / 4000);
     });
 
-    it('5. Ultra-tall image preserves aspect ratio', () => {
+    it('6. Ultra-tall image preserves aspect ratio when maxDimension is specified', () => {
       const result = calculateTargetDimensions(1000, 10000, 2400);
       expect(result).toEqual({ width: 240, height: 2400 });
       expect(result.width / result.height).toBeCloseTo(1000 / 10000);
     });
 
-    it('6. Image above 2400px is correctly downscaled', () => {
+    it('7. Image above specified maxDimension is correctly downscaled', () => {
       const result = calculateTargetDimensions(3600, 2700, 2400);
       expect(result).toEqual({ width: 2400, height: 1800 });
       expect(Math.max(result.width, result.height)).toBe(2400);
@@ -144,7 +149,7 @@ describe('imageOptimizer utilities', () => {
       expect(resultFull.dataUrl).toBe(jpegItem.previewUrl);
     });
 
-    it('downscales images > 2400px when calling processImageForPdf', async () => {
+    it('preserves full original pixel dimensions when calling processImageForPdf by default', async () => {
       const largeItem: ImageItem = {
         id: 'large-1',
         file: new File([], 'large.jpg', { type: 'image/jpeg' }),
@@ -157,8 +162,12 @@ describe('imageOptimizer utilities', () => {
       };
 
       const result = await processImageForPdf(largeItem, 'JPG', 0.85);
-      expect(result.width).toBe(2400);
-      expect(result.height).toBe(1800);
+      expect(result.width).toBe(4000);
+      expect(result.height).toBe(3000);
+
+      const resScaled = await processImageForPdf(largeItem, 'JPG', 0.85, 2400);
+      expect(resScaled.width).toBe(2400);
+      expect(resScaled.height).toBe(1800);
     });
   });
 });
