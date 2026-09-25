@@ -17,7 +17,7 @@ import type {
 import { readImageData } from './utils/imageOptimizer';
 import { generatePdfFromImages } from './utils/pdfGenerator';
 import { generateZipFromImages } from './utils/zipGenerator';
-import { FileText, Sparkles, Sliders, Info, Image as ImageIcon, Archive } from 'lucide-react';
+import { Sparkles, Sliders, Info, Archive } from 'lucide-react';
 
 export const App: React.FC = () => {
   const [exportMode, setExportMode] = useState<ExportMode>('pdf');
