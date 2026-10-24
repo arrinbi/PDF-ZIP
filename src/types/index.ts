@@ -23,7 +23,37 @@ export type OutputFormat = 'JPG' | 'PNG';
 
 export type ZipOutputFormat = 'ORIGINAL' | 'JPG' | 'PNG' | 'WEBP';
 
-export type ExportMode = 'pdf' | 'zip';
+export type ExportMode = 'pdf' | 'zip' | 'split' | 'protect';
+
+export type SplitMode = 'range' | 'every_page' | 'select';
+
+export interface SplitResultItem {
+  filename: string;
+  blob: Blob;
+  url: string;
+  sizeBytes: number;
+  pageCount: number;
+  pagesLabel: string;
+}
+
+export interface SplitPdfResult {
+  isSingle: boolean;
+  pdf?: SplitResultItem;
+  zip?: {
+    blob: Blob;
+    url: string;
+    sizeBytes: number;
+    filename: string;
+  };
+  files: SplitResultItem[];
+}
+
+export interface ProtectPdfResult {
+  blob: Blob;
+  url: string;
+  sizeBytes: number;
+  filename: string;
+}
 
 export interface PdfOptions {
   pageSize: 'fit' | 'a4' | 'letter';
