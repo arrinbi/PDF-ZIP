@@ -9,35 +9,47 @@ interface HeaderProps {
 
 export const Header: React.FC<HeaderProps> = ({ exportMode, onExportModeChange }) => {
   return (
-    <header className="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-xs">
-      <div className="max-w-4xl mx-auto px-4 py-3 sm:py-4 flex items-center justify-between">
-        <div className="flex items-center gap-2.5">
-          <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center text-white shadow-md shadow-indigo-100">
-            <FileImage className="w-5 h-5" />
+    <header className="bg-white/90 backdrop-blur-md border-b border-slate-200/80 sticky top-0 z-30 shadow-xs">
+      <div className="max-w-5xl mx-auto px-4 py-3 sm:py-3.5 flex flex-col sm:flex-row items-center justify-between gap-3">
+        <div className="flex items-center justify-between w-full sm:w-auto">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl bg-slate-800 flex items-center justify-center text-white shadow-xs">
+              <FileImage className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight leading-none">
+                  PDF-ZIP
+                </h1>
+                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
+                  Pro
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-500 hidden sm:block mt-0.5">
+                Fast & secure browser-based document toolkit
+              </p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-lg sm:text-xl font-bold text-slate-900 tracking-tight leading-tight">
-              Img2PDF <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100">HD</span>
-            </h1>
-            <p className="text-xs text-slate-500 hidden sm:block">
-              Fast, original-quality Image converter
-            </p>
+
+          <div className="sm:hidden flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 border border-slate-200 text-slate-700 text-[11px] font-medium">
+            <ShieldCheck className="w-3 h-3 text-slate-600" />
+            <span>Local</span>
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 w-full sm:w-auto justify-center sm:justify-end">
           {/* Main Navigation [ PDF ] [ ZIP ] [ Split PDF ] [ Protect PDF ] */}
-          <div className="inline-flex p-1 bg-slate-100 rounded-xl border border-slate-200 text-xs sm:text-sm font-semibold overflow-x-auto">
+          <nav className="inline-flex p-1 bg-slate-100/80 rounded-xl border border-slate-200/80 text-xs font-medium max-w-full overflow-x-auto no-scrollbar">
             <button
               type="button"
               onClick={() => onExportModeChange('pdf')}
               className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
                 exportMode === 'pdf'
-                  ? 'bg-white text-indigo-700 shadow-xs font-bold'
-                  : 'text-slate-600 hover:text-slate-900'
+                  ? 'bg-slate-800 text-white shadow-xs font-semibold'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
               }`}
             >
-              <FileText className="w-4 h-4" />
+              <FileText className="w-3.5 h-3.5" />
               <span>PDF</span>
             </button>
             <button
@@ -45,11 +57,11 @@ export const Header: React.FC<HeaderProps> = ({ exportMode, onExportModeChange }
               onClick={() => onExportModeChange('zip')}
               className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
                 exportMode === 'zip'
-                  ? 'bg-white text-indigo-700 shadow-xs font-bold'
-                  : 'text-slate-600 hover:text-slate-900'
+                  ? 'bg-slate-800 text-white shadow-xs font-semibold'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
               }`}
             >
-              <Archive className="w-4 h-4" />
+              <Archive className="w-3.5 h-3.5" />
               <span>ZIP</span>
             </button>
             <button
@@ -57,11 +69,11 @@ export const Header: React.FC<HeaderProps> = ({ exportMode, onExportModeChange }
               onClick={() => onExportModeChange('split')}
               className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
                 exportMode === 'split'
-                  ? 'bg-white text-indigo-700 shadow-xs font-bold'
-                  : 'text-slate-600 hover:text-slate-900'
+                  ? 'bg-slate-800 text-white shadow-xs font-semibold'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
               }`}
             >
-              <Scissors className="w-4 h-4" />
+              <Scissors className="w-3.5 h-3.5" />
               <span>Split PDF</span>
             </button>
             <button
@@ -69,17 +81,17 @@ export const Header: React.FC<HeaderProps> = ({ exportMode, onExportModeChange }
               onClick={() => onExportModeChange('protect')}
               className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
                 exportMode === 'protect'
-                  ? 'bg-white text-indigo-700 shadow-xs font-bold'
-                  : 'text-slate-600 hover:text-slate-900'
+                  ? 'bg-slate-800 text-white shadow-xs font-semibold'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
               }`}
             >
-              <Lock className="w-4 h-4" />
+              <Lock className="w-3.5 h-3.5" />
               <span>Protect PDF</span>
             </button>
-          </div>
+          </nav>
 
-          <div className="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-medium">
-            <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+          <div className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100 border border-slate-200 text-slate-700 text-xs font-medium">
+            <ShieldCheck className="w-3.5 h-3.5 text-slate-600" />
             <span>Local & Private</span>
           </div>
         </div>
