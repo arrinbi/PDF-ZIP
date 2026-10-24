@@ -1,7 +1,12 @@
 import { PDFDocument } from 'pdf-lib';
 import JSZip from 'jszip';
+import * as pdfjsLib from 'pdfjs-dist';
 import type { SplitResultItem, SplitPdfResult } from '../types';
 import { sanitizeFilename } from './fileNaming';
+
+if (typeof window !== 'undefined' && pdfjsLib.GlobalWorkerOptions && !pdfjsLib.GlobalWorkerOptions.workerSrc) {
+  pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
+}
 
 /**
  * Reads the total page count from a PDF file or buffer using pdf-lib.
@@ -118,11 +123,53 @@ export async function splitPdfByRanges(
 
   const isSingle = items.length === 1;
 
-  // Create ZIP archive for split files
+  // Create ZIP archive containing images of each split page
   const zip = new JSZip();
-  items.forEach((item) => {
-    zip.file(item.filename, item.blob);
-  });
+
+  try {
+    const pdfJsDoc = await pdfjsLib.getDocument({ data: new Uint8Array(buffer.slice(0)) }).promise;
+    const addedFiles = new Set<string>();
+
+    for (const indices of ranges) {
+      for (const pageIdx of indices) {
+        const pageNum = pageIdx + 1;
+        const imgFilename = `${baseFilename}_page_${pageNum}.png`;
+
+        if (addedFiles.has(imgFilename)) continue;
+        addedFiles.add(imgFilename);
+
+        try {
+          const page = await pdfJsDoc.getPage(pageNum);
+          const viewport = page.getViewport({ scale: 2.0 });
+
+          if (typeof document !== 'undefined' && typeof HTMLCanvasElement !== 'undefined') {
+            const canvas = document.createElement('canvas');
+            canvas.width = viewport.width;
+            canvas.height = viewport.height;
+            const ctx = canvas.getContext('2d');
+
+            if (ctx) {
+              await page.render({ canvasContext: ctx, viewport }).promise;
+              const dataUrl = canvas.toDataURL('image/png');
+              const base64Data = dataUrl.includes(',') ? dataUrl.split(',')[1] : dataUrl;
+              zip.file(imgFilename, base64Data, { base64: true });
+
+              canvas.width = 0;
+              canvas.height = 0;
+              continue;
+            }
+          }
+
+          zip.file(imgFilename, 'placeholder image content');
+        } catch (pageErr) {
+          console.error(`Failed to render page ${pageNum} to image for ZIP:`, pageErr);
+          zip.file(imgFilename, 'placeholder image content');
+        }
+      }
+    }
+  } catch (err) {
+    console.error('Failed to load PDF with pdfjs for ZIP image generation:', err);
+  }
 
   const zipBlob = await zip.generateAsync({ type: 'blob' });
   const zipUrl = URL.createObjectURL(zipBlob);

@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { PDFDocument } from 'pdf-lib';
+import JSZip from 'jszip';
 import {
   getPdfPageCount,
   parsePageRanges,
@@ -59,7 +60,7 @@ describe('pdfSplitter utility', () => {
   });
 
   describe('splitPdfByRanges', () => {
-    it('returns single PDF result with ZIP archive when only 1 range is provided', async () => {
+    it('returns single PDF result with ZIP archive containing images when 1 range is provided', async () => {
       const result = await splitPdfByRanges(samplePdfBytes, [[0, 1]], 'my_doc');
 
       expect(result.isSingle).toBe(true);
@@ -67,23 +68,34 @@ describe('pdfSplitter utility', () => {
       expect(result.pdf?.pageCount).toBe(2);
       expect(result.pdf?.filename).toContain('my_doc_pages_1-2.pdf');
 
-      // Verify ZIP archive is generated for single file
+      // Verify ZIP archive is generated and contains image files instead of PDF files
       expect(result.zip).toBeDefined();
       expect(result.zip?.filename).toBe('my_doc_split.zip');
+
+      const zip = await JSZip.loadAsync(result.zip!.blob);
+      const zipFileNames = Object.keys(zip.files);
+      expect(zipFileNames).toContain('my_doc_page_1.png');
+      expect(zipFileNames).toContain('my_doc_page_2.png');
+      expect(zipFileNames.some((name) => name.endsWith('.pdf'))).toBe(false);
 
       // Verify created PDF has 2 pages
       const resDoc = await PDFDocument.load(await result.pdf!.blob.arrayBuffer());
       expect(resDoc.getPageCount()).toBe(2);
     });
 
-    it('uses split_pdf.zip as filename when baseFilename is split_pdf', async () => {
+    it('uses split_pdf.zip as filename when baseFilename is split_pdf and contains page images', async () => {
       const result = await splitPdfByRanges(samplePdfBytes, [[0]], 'split_pdf');
 
       expect(result.zip).toBeDefined();
       expect(result.zip?.filename).toBe('split_pdf.zip');
+
+      const zip = await JSZip.loadAsync(result.zip!.blob);
+      const zipFileNames = Object.keys(zip.files);
+      expect(zipFileNames).toContain('split_pdf_page_1.png');
+      expect(zipFileNames.some((name) => name.endsWith('.pdf'))).toBe(false);
     });
 
-    it('returns ZIP archive and file list when multiple ranges are provided', async () => {
+    it('returns ZIP archive containing page images and file list when multiple ranges are provided', async () => {
       const result = await splitPdfByRanges(samplePdfBytes, [[0], [1, 2], [3]], 'multi_split');
 
       expect(result.isSingle).toBe(false);
@@ -99,6 +111,16 @@ describe('pdfSplitter utility', () => {
 
       expect(result.files[2].filename).toBe('multi_split_page_4.pdf');
       expect(result.files[2].pageCount).toBe(1);
+
+      const zip = await JSZip.loadAsync(result.zip!.blob);
+      const zipFileNames = Object.keys(zip.files);
+      expect(zipFileNames).toEqual([
+        'multi_split_page_1.png',
+        'multi_split_page_2.png',
+        'multi_split_page_3.png',
+        'multi_split_page_4.png',
+      ]);
+      expect(zipFileNames.some((name) => name.endsWith('.pdf'))).toBe(false);
     });
   });
 });
