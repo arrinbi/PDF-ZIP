@@ -14,30 +14,30 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({ progress, title }) => 
       : 0;
 
   return (
-    <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs max-w-lg mx-auto text-center space-y-4 my-8">
-      <div className="flex items-center justify-center gap-3">
-        <Loader2 className="w-6 h-6 text-indigo-600 animate-spin" />
-        <h3 className="text-base font-semibold text-slate-800">
+    <div className="bg-white border border-slate-200/80 rounded-2xl p-6 sm:p-7 shadow-2xs max-w-md mx-auto text-center space-y-4 my-8">
+      <div className="flex items-center justify-center gap-2.5">
+        <Loader2 className="w-5 h-5 text-slate-800 animate-spin" />
+        <h3 className="text-base font-bold text-slate-900">
           {title || 'Processing...'}
         </h3>
       </div>
 
       <div className="space-y-2">
         <div className="flex justify-between text-xs text-slate-500 font-medium">
-          <span>{progress.message}</span>
-          <span>{percentage}%</span>
+          <span className="truncate pr-2">{progress.message}</span>
+          <span className="font-semibold text-slate-700">{percentage}%</span>
         </div>
 
-        <div className="w-full h-3 bg-slate-100 rounded-full overflow-hidden p-0.5 border border-slate-200">
+        <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden border border-slate-200/60 p-0.5">
           <div
-            className="h-full bg-gradient-to-r from-indigo-500 to-indigo-600 rounded-full transition-all duration-300 ease-out"
+            className="h-full bg-slate-800 rounded-full transition-all duration-300 ease-out"
             style={{ width: `${percentage}%` }}
           />
         </div>
       </div>
 
-      <p className="text-xs text-slate-400">
-        Processing locally in your browser for privacy & speed.
+      <p className="text-[11px] text-slate-400">
+        Processing 100% locally in your browser for privacy & speed.
       </p>
     </div>
   );

@@ -281,14 +281,14 @@ export const BatchProcessing: React.FC<BatchProcessingProps> = ({ exportMode = '
 
       {/* View 1: Processing Complete (Results View - NO Automatic Downloads) */}
       {batchResults.length > 0 && !isProcessing ? (
-        <div className="bg-white border border-slate-200 rounded-2xl p-6 space-y-6 shadow-xs">
+        <div className="bg-white border border-slate-200/80 rounded-2xl p-6 space-y-6 shadow-2xs">
           <div className="flex items-center justify-between border-b border-slate-100 pb-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-green-50 text-green-600 flex items-center justify-center">
-                <CheckCircle2 className="w-6 h-6" />
+              <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-800 flex items-center justify-center">
+                <CheckCircle2 className="w-5 h-5 text-emerald-600" />
               </div>
               <div>
-                <h2 className="text-lg font-bold text-slate-800">
+                <h2 className="text-base sm:text-lg font-bold text-slate-900">
                   Batch Processing Complete
                 </h2>
                 <p className="text-xs text-slate-500">
@@ -302,7 +302,7 @@ export const BatchProcessing: React.FC<BatchProcessingProps> = ({ exportMode = '
               <button
                 type="button"
                 onClick={handleDownloadAll}
-                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs sm:text-sm rounded-xl shadow-xs transition-all flex items-center gap-2 cursor-pointer"
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white font-medium text-xs sm:text-sm rounded-xl shadow-xs transition-all flex items-center gap-2 cursor-pointer"
               >
                 <Download className="w-4 h-4" />
                 <span>Download All</span>
@@ -311,13 +311,13 @@ export const BatchProcessing: React.FC<BatchProcessingProps> = ({ exportMode = '
           </div>
 
           {/* Results List */}
-          <div className="space-y-3">
+          <div className="space-y-2.5">
             {batchResults.map((item) => (
               <div
                 key={item.id}
-                className={`flex items-center justify-between border rounded-xl p-3.5 text-sm transition-colors ${
+                className={`flex items-center justify-between border rounded-xl p-3 text-xs sm:text-sm transition-colors ${
                   item.status === 'success'
-                    ? 'bg-slate-50 border-slate-200'
+                    ? 'bg-slate-50/50 border-slate-200'
                     : 'bg-red-50/50 border-red-200 text-red-900'
                 }`}
               >
@@ -325,7 +325,7 @@ export const BatchProcessing: React.FC<BatchProcessingProps> = ({ exportMode = '
                   <div
                     className={`w-8 h-8 rounded-lg flex items-center justify-center ${
                       item.status === 'success'
-                        ? 'bg-indigo-50 text-indigo-600'
+                        ? 'bg-slate-100 text-slate-700'
                         : 'bg-red-100 text-red-600'
                     }`}
                   >
@@ -338,7 +338,7 @@ export const BatchProcessing: React.FC<BatchProcessingProps> = ({ exportMode = '
                   <div>
                     <p className="font-semibold text-slate-800">{item.folderName}</p>
                     {item.status === 'success' ? (
-                      <p className="text-xs text-slate-500 flex items-center gap-2">
+                      <p className="text-[11px] text-slate-500 flex items-center gap-2">
                         <span className="font-medium text-emerald-600">
                           {exportMode.toUpperCase()} ready
                         </span>
@@ -346,7 +346,7 @@ export const BatchProcessing: React.FC<BatchProcessingProps> = ({ exportMode = '
                         <span>{formatFileSize(item.sizeBytes || 0)}</span>
                       </p>
                     ) : (
-                      <p className="text-xs text-red-600 font-medium">
+                      <p className="text-[11px] text-red-600 font-medium">
                         {item.errorMessage || 'Failed to process folder'}
                       </p>
                     )}
@@ -357,7 +357,7 @@ export const BatchProcessing: React.FC<BatchProcessingProps> = ({ exportMode = '
                   <button
                     type="button"
                     onClick={() => triggerDownload(item.downloadUrl!, item.filename!)}
-                    className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                    className="px-3 py-1.5 bg-slate-800 hover:bg-slate-900 text-white text-xs font-medium rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
                   >
                     <Download className="w-3.5 h-3.5" />
                     <span>Download</span>
@@ -371,7 +371,7 @@ export const BatchProcessing: React.FC<BatchProcessingProps> = ({ exportMode = '
             <button
               type="button"
               onClick={() => setBatchResults([])}
-              className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium text-xs sm:text-sm rounded-xl transition-colors cursor-pointer"
+              className="px-4 py-2 bg-slate-100 hover:bg-slate-200/80 text-slate-700 font-medium text-xs sm:text-sm rounded-xl transition-colors cursor-pointer"
             >
               Back to Folder Selection
             </button>
@@ -380,7 +380,7 @@ export const BatchProcessing: React.FC<BatchProcessingProps> = ({ exportMode = '
               <button
                 type="button"
                 onClick={handleDownloadAll}
-                className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs sm:text-sm rounded-xl shadow-xs transition-all flex items-center gap-2 cursor-pointer"
+                className="px-5 py-2.5 bg-slate-800 hover:bg-slate-900 text-white font-medium text-xs sm:text-sm rounded-xl shadow-xs transition-all flex items-center gap-2 cursor-pointer"
               >
                 <Download className="w-4 h-4" />
                 <span>Download All ({batchResults.filter((r) => r.status === 'success').length})</span>
@@ -390,17 +390,17 @@ export const BatchProcessing: React.FC<BatchProcessingProps> = ({ exportMode = '
         </div>
       ) : isProcessing ? (
         /* View 2: Progress View */
-        <div className="bg-white border border-slate-200 rounded-2xl p-8 space-y-6 text-center shadow-xs">
-          <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 mx-auto flex items-center justify-center animate-pulse">
-            <Play className="w-6 h-6" />
+        <div className="bg-white border border-slate-200/80 rounded-2xl p-8 space-y-5 text-center shadow-2xs">
+          <div className="w-12 h-12 rounded-2xl bg-slate-100 text-slate-800 mx-auto flex items-center justify-center animate-pulse">
+            <Play className="w-5 h-5 fill-slate-800" />
           </div>
-          <div className="space-y-2">
-            <h3 className="text-lg font-bold text-slate-800">Batch Processing in Progress</h3>
-            <p className="text-sm text-slate-600">{currentProgressText}</p>
+          <div className="space-y-1.5">
+            <h3 className="text-base sm:text-lg font-bold text-slate-900">Batch Processing in Progress</h3>
+            <p className="text-xs sm:text-sm text-slate-500">{currentProgressText}</p>
           </div>
-          <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden max-w-md mx-auto">
+          <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden max-w-md mx-auto border border-slate-200/60">
             <div
-              className="bg-indigo-600 h-2.5 rounded-full transition-all duration-300"
+              className="bg-slate-800 h-2 rounded-full transition-all duration-300"
               style={{
                 width: `${
                   discoveredSubfolders.length > 0 && currentProcessingIndex >= 0
@@ -417,17 +417,17 @@ export const BatchProcessing: React.FC<BatchProcessingProps> = ({ exportMode = '
         </div>
       ) : (
         /* View 3: Main Batch Folder Chooser & Checklist Selection View */
-        <div className="space-y-6">
+        <div className="space-y-5">
           {/* Top Options & Select Parent Folder Header */}
-          <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-5 shadow-xs">
+          <div className="bg-white border border-slate-200/80 rounded-2xl p-5 space-y-4 shadow-2xs">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
               <div>
-                <h2 className="text-base font-bold text-slate-800 flex items-center gap-2">
-                  <FolderTree className="w-5 h-5 text-indigo-600" />
+                <h2 className="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-2">
+                  <FolderTree className="w-4 h-4 text-slate-700" />
                   Batch Parent Folder
                 </h2>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Select a parent directory to automatically scan and convert its subfolders into individual {exportMode.toUpperCase()} files.
+                  Select a parent directory to scan and convert subfolders into individual {exportMode.toUpperCase()} files.
                 </p>
               </div>
 
@@ -435,7 +435,7 @@ export const BatchProcessing: React.FC<BatchProcessingProps> = ({ exportMode = '
                 <button
                   type="button"
                   onClick={() => folderInputRef.current?.click()}
-                  className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 active:scale-98 text-white text-xs sm:text-sm font-semibold rounded-xl shadow-xs transition-all flex items-center gap-2 cursor-pointer"
+                  className="px-4 py-2 bg-slate-800 hover:bg-slate-900 active:scale-98 text-white text-xs sm:text-sm font-medium rounded-xl shadow-xs transition-all flex items-center gap-2 cursor-pointer"
                 >
                   <FolderPlus className="w-4 h-4" />
                   <span>{parentFolderName ? 'Select Different Parent Folder' : 'Select Parent Folder'}</span>
@@ -444,9 +444,9 @@ export const BatchProcessing: React.FC<BatchProcessingProps> = ({ exportMode = '
             </div>
 
             {/* Export Mode Settings */}
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 text-slate-800 font-semibold text-xs border-b border-slate-100 pb-2">
-                <Sliders className="w-4 h-4 text-indigo-600" />
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 text-slate-800 font-bold text-xs border-b border-slate-100 pb-2">
+                <Sliders className="w-3.5 h-3.5 text-slate-700" />
                 <span>Batch {exportMode.toUpperCase()} Settings</span>
               </div>
 
@@ -464,7 +464,7 @@ export const BatchProcessing: React.FC<BatchProcessingProps> = ({ exportMode = '
                           onClick={() => setOutputFormat(fmt)}
                           className={`py-1.5 text-xs font-medium rounded-lg border transition-all cursor-pointer text-center ${
                             outputFormat === fmt
-                              ? 'bg-indigo-50 border-indigo-500 text-indigo-700 font-semibold shadow-xs'
+                              ? 'bg-slate-800 border-slate-800 text-white shadow-2xs font-semibold'
                               : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
                           }`}
                         >
@@ -480,8 +480,8 @@ export const BatchProcessing: React.FC<BatchProcessingProps> = ({ exportMode = '
                       value={quality}
                       onChange={(e) => setQuality(parseFloat(e.target.value))}
                       disabled={outputFormat === 'PNG'}
-                      className={`w-full px-3 py-1.5 border border-slate-300 rounded-lg text-xs focus:ring-2 focus:ring-indigo-500 outline-hidden ${
-                        outputFormat === 'PNG' ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-white text-slate-800'
+                      className={`w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs focus:ring-2 focus:ring-slate-400 outline-hidden ${
+                        outputFormat === 'PNG' ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-slate-50/50 text-slate-800'
                       }`}
                     >
                       {qualityOptions.map((q) => (
@@ -506,7 +506,7 @@ export const BatchProcessing: React.FC<BatchProcessingProps> = ({ exportMode = '
                           onClick={() => setZipOutputFormat(fmt)}
                           className={`py-1.5 px-1 text-xs font-medium rounded-lg border transition-all cursor-pointer text-center ${
                             zipOutputFormat === fmt
-                              ? 'bg-indigo-50 border-indigo-500 text-indigo-700 font-semibold shadow-xs'
+                              ? 'bg-slate-800 border-slate-800 text-white shadow-2xs font-semibold'
                               : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
                           }`}
                         >
@@ -522,10 +522,10 @@ export const BatchProcessing: React.FC<BatchProcessingProps> = ({ exportMode = '
                       value={quality}
                       onChange={(e) => setQuality(parseFloat(e.target.value))}
                       disabled={zipOutputFormat === 'ORIGINAL' || zipOutputFormat === 'PNG'}
-                      className={`w-full px-3 py-1.5 border border-slate-300 rounded-lg text-xs focus:ring-2 focus:ring-indigo-500 outline-hidden ${
+                      className={`w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs focus:ring-2 focus:ring-slate-400 outline-hidden ${
                         zipOutputFormat === 'ORIGINAL' || zipOutputFormat === 'PNG'
                           ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
-                          : 'bg-white text-slate-800'
+                          : 'bg-slate-50/50 text-slate-800'
                       }`}
                     >
                       {qualityOptions.map((q) => (
@@ -544,12 +544,12 @@ export const BatchProcessing: React.FC<BatchProcessingProps> = ({ exportMode = '
           {discoveredSubfolders.length === 0 ? (
             <div
               onClick={() => folderInputRef.current?.click()}
-              className="border-2 border-dashed border-slate-300 hover:border-indigo-500 bg-white hover:bg-indigo-50/20 transition-all rounded-2xl p-10 text-center cursor-pointer flex flex-col items-center justify-center min-h-[220px]"
+              className="border-2 border-dashed border-slate-200 hover:border-slate-400 bg-white hover:bg-slate-50/50 transition-all rounded-2xl p-8 sm:p-10 text-center cursor-pointer flex flex-col items-center justify-center min-h-[220px] shadow-2xs"
             >
-              <div className="w-14 h-14 mb-3 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+              <div className="w-14 h-14 mb-3 rounded-2xl bg-slate-100 text-slate-700 flex items-center justify-center">
                 <FolderPlus className="w-7 h-7" />
               </div>
-              <h3 className="text-base font-semibold text-slate-800 mb-1">
+              <h3 className="text-base font-bold text-slate-900 mb-1">
                 No Parent Folder Selected
               </h3>
               <p className="text-xs sm:text-sm text-slate-500 mb-4 max-w-md">
@@ -557,28 +557,28 @@ export const BatchProcessing: React.FC<BatchProcessingProps> = ({ exportMode = '
               </p>
             </div>
           ) : (
-            <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-4 shadow-xs">
+            <div className="bg-white border border-slate-200/80 rounded-2xl p-5 space-y-4 shadow-2xs">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
                 <div>
-                  <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                  <h3 className="text-xs sm:text-sm font-bold text-slate-900 flex items-center gap-2">
                     <span>Parent Directory:</span>
-                    <span className="text-indigo-600 font-extrabold">{parentFolderName}</span>
+                    <span className="text-slate-800 font-extrabold underline">{parentFolderName}</span>
                   </h3>
-                  <p className="text-xs text-slate-500 mt-0.5">
+                  <p className="text-[11px] text-slate-500 mt-0.5">
                     {selectedCount} of {discoveredSubfolders.length} subfolders selected ({totalSelectedImages} images to process)
                   </p>
                 </div>
 
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2.5">
                   <button
                     type="button"
                     onClick={handleSelectAll}
-                    className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 cursor-pointer flex items-center gap-1"
+                    className="text-xs font-semibold text-slate-700 hover:text-slate-900 cursor-pointer flex items-center gap-1"
                   >
                     <CheckSquare className="w-3.5 h-3.5" />
                     <span>Select All</span>
                   </button>
-                  <span className="text-slate-300">|</span>
+                  <span className="text-slate-200">|</span>
                   <button
                     type="button"
                     onClick={handleDeselectAll}
@@ -587,7 +587,7 @@ export const BatchProcessing: React.FC<BatchProcessingProps> = ({ exportMode = '
                     <Square className="w-3.5 h-3.5" />
                     <span>Deselect All</span>
                   </button>
-                  <span className="text-slate-300">|</span>
+                  <span className="text-slate-200">|</span>
                   <button
                     type="button"
                     onClick={handleClearSelection}
@@ -599,7 +599,7 @@ export const BatchProcessing: React.FC<BatchProcessingProps> = ({ exportMode = '
               </div>
 
               {/* Subfolder Checklist List */}
-              <div className="space-y-3 max-h-[420px] overflow-y-auto pr-1">
+              <div className="space-y-2.5 max-h-[420px] overflow-y-auto pr-1">
                 {discoveredSubfolders.map((sf) => {
                   const isChecked = selectedFolderIds.has(sf.id);
                   const currentOutputName = customOutputNames[sf.id] ?? sf.name;
@@ -610,8 +610,8 @@ export const BatchProcessing: React.FC<BatchProcessingProps> = ({ exportMode = '
                       onClick={() => handleToggleSubfolder(sf.id)}
                       className={`flex flex-col sm:flex-row sm:items-center justify-between border rounded-xl p-3 cursor-pointer transition-all gap-3 ${
                         isChecked
-                          ? 'bg-indigo-50/60 border-indigo-200 shadow-2xs'
-                          : 'bg-white border-slate-200 hover:bg-slate-50 opacity-75'
+                          ? 'bg-slate-50/80 border-slate-300/80 shadow-2xs'
+                          : 'bg-white border-slate-200 hover:bg-slate-50 opacity-60'
                       }`}
                     >
                       <div className="flex items-start sm:items-center gap-3 min-w-0 flex-1">
@@ -619,15 +619,15 @@ export const BatchProcessing: React.FC<BatchProcessingProps> = ({ exportMode = '
                           type="checkbox"
                           checked={isChecked}
                           onChange={() => {}} // handled by parent onClick
-                          className="w-4 h-4 mt-1 sm:mt-0 text-indigo-600 rounded-md border-slate-300 focus:ring-indigo-500 cursor-pointer shrink-0"
+                          className="w-4 h-4 mt-1 sm:mt-0 text-slate-800 rounded-md border-slate-300 focus:ring-slate-500 cursor-pointer shrink-0"
                         />
-                        <Folder className={`w-5 h-5 shrink-0 mt-0.5 sm:mt-0 ${isChecked ? 'text-indigo-600' : 'text-slate-400'}`} />
+                        <Folder className={`w-5 h-5 shrink-0 mt-0.5 sm:mt-0 ${isChecked ? 'text-slate-800' : 'text-slate-400'}`} />
                         <div className="min-w-0 flex-1 space-y-1.5">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <p className={`text-sm font-semibold truncate ${isChecked ? 'text-slate-900' : 'text-slate-600'}`}>
+                            <p className={`text-xs sm:text-sm font-semibold truncate ${isChecked ? 'text-slate-900' : 'text-slate-600'}`}>
                               {sf.name}
                             </p>
-                            <span className="text-xs text-slate-500">
+                            <span className="text-[11px] text-slate-500">
                               • {sf.imageCount} image{sf.imageCount === 1 ? '' : 's'}
                             </span>
                           </div>
@@ -638,7 +638,7 @@ export const BatchProcessing: React.FC<BatchProcessingProps> = ({ exportMode = '
                           >
                             <label
                               htmlFor={`output-name-${sf.id}`}
-                              className="text-xs font-medium text-slate-600 shrink-0"
+                              className="text-xs font-medium text-slate-500 shrink-0"
                             >
                               Output name:
                             </label>
@@ -648,15 +648,15 @@ export const BatchProcessing: React.FC<BatchProcessingProps> = ({ exportMode = '
                               value={currentOutputName}
                               onChange={(e) => handleOutputNameChange(sf.id, e.target.value)}
                               onBlur={() => handleOutputNameBlur(sf.id, sf.name)}
-                              className="px-2.5 py-1 text-xs border border-slate-300 rounded-lg bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-hidden min-w-[200px] max-w-full text-slate-800"
+                              className="px-2.5 py-1 text-xs border border-slate-200 rounded-lg bg-white focus:ring-2 focus:ring-slate-400 outline-hidden min-w-[180px] max-w-full text-slate-800"
                               placeholder="Enter output name"
                             />
                           </div>
                         </div>
                       </div>
 
-                      <span className={`text-xs font-semibold px-2 py-0.5 rounded-full self-start sm:self-center shrink-0 ${
-                        isChecked ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-500'
+                      <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-md self-start sm:self-center shrink-0 border ${
+                        isChecked ? 'bg-slate-800 text-white border-slate-800' : 'bg-slate-100 text-slate-500 border-slate-200'
                       }`}>
                         {isChecked ? 'Selected' : 'Ignored'}
                       </span>
@@ -671,9 +671,9 @@ export const BatchProcessing: React.FC<BatchProcessingProps> = ({ exportMode = '
                   type="button"
                   onClick={handleStartBatchProcessing}
                   disabled={selectedCount === 0}
-                  className={`py-3 px-6 text-white font-semibold text-sm rounded-xl transition-all flex items-center gap-2 ${
+                  className={`py-2.5 px-5 text-white font-medium text-xs sm:text-sm rounded-xl transition-all flex items-center gap-2 ${
                     selectedCount > 0
-                      ? 'bg-indigo-600 hover:bg-indigo-700 active:scale-98 shadow-md shadow-indigo-200 cursor-pointer'
+                      ? 'bg-slate-800 hover:bg-slate-900 active:scale-98 shadow-xs cursor-pointer'
                       : 'bg-slate-300 cursor-not-allowed opacity-60'
                   }`}
                 >
