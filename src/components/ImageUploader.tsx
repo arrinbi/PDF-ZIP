@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import { Upload, Image as ImageIcon, Plus } from 'lucide-react';
+import { Upload, Image as ImageIcon, Plus, Sparkles } from 'lucide-react';
 
 interface ImageUploaderProps {
   onImagesSelected: (files: File[]) => void;
@@ -49,7 +49,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({ onImagesSelected, 
         <button
           type="button"
           onClick={() => fileInputRef.current?.click()}
-          className="inline-flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-300 text-slate-700 font-medium text-sm rounded-xl shadow-xs hover:bg-slate-50 focus:outline-hidden focus:ring-2 focus:ring-indigo-500 active:bg-slate-100 transition-colors cursor-pointer"
+          className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-50 border border-indigo-200/80 text-indigo-700 font-semibold text-xs sm:text-sm rounded-xl hover:bg-indigo-100/80 focus:outline-hidden focus:ring-2 focus:ring-indigo-500 active:scale-98 transition-all cursor-pointer shadow-2xs"
         >
           <Plus className="w-4 h-4 text-indigo-600" />
           <span>Add More Images</span>
@@ -63,7 +63,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({ onImagesSelected, 
       onDragOver={handleDragOver}
       onDrop={handleDrop}
       onClick={() => fileInputRef.current?.click()}
-      className="group relative border-2 border-dashed border-slate-300 hover:border-indigo-500 bg-white hover:bg-indigo-50/20 transition-all rounded-2xl p-8 text-center cursor-pointer flex flex-col items-center justify-center min-h-[260px]"
+      className="group relative border-2 border-dashed border-slate-300 hover:border-indigo-500 bg-white hover:bg-indigo-50/20 transition-all duration-200 rounded-3xl p-8 sm:p-12 text-center cursor-pointer flex flex-col items-center justify-center min-h-[280px] shadow-2xs hover:shadow-xs"
     >
       <input
         ref={fileInputRef}
@@ -74,30 +74,33 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({ onImagesSelected, 
         onChange={handleChange}
       />
 
-      <div className="w-16 h-16 mb-4 rounded-2xl bg-indigo-50 text-indigo-600 group-hover:scale-110 group-hover:bg-indigo-100 transition-all flex items-center justify-center">
+      <div className="w-16 h-16 mb-4 rounded-2xl bg-indigo-50 text-indigo-600 group-hover:scale-110 group-hover:bg-indigo-600 group-hover:text-white transition-all duration-200 flex items-center justify-center shadow-xs">
         <Upload className="w-8 h-8" />
       </div>
 
-      <h2 className="text-lg font-semibold text-slate-800 mb-1">
+      <h2 className="text-lg sm:text-xl font-bold text-slate-900 mb-1">
         Select or Drop Images
       </h2>
-      <p className="text-xs sm:text-sm text-slate-500 mb-4 max-w-sm">
-        Choose multiple images to combine into one PDF.
+      <p className="text-xs sm:text-sm text-slate-500 mb-5 max-w-sm">
+        Choose multiple images to combine into a PDF document or export as a ZIP archive.
       </p>
 
       <button
         type="button"
-        className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 active:scale-98 text-white font-semibold text-sm rounded-xl shadow-md shadow-indigo-200 transition-all flex items-center gap-2"
+        className="px-6 py-2.5 bg-indigo-600 group-hover:bg-indigo-700 text-white font-bold text-sm rounded-xl shadow-md shadow-indigo-200 transition-all flex items-center gap-2 cursor-pointer"
       >
         <ImageIcon className="w-4 h-4" />
-        <span>Add Images</span>
+        <span>Browse Images</span>
       </button>
 
       <div className="mt-6 flex items-center gap-2 text-xs text-slate-400 font-medium">
-        <span>Supported:</span>
-        <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600">JPG</span>
-        <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600">PNG</span>
-        <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600">WEBP</span>
+        <span className="text-slate-500 font-semibold flex items-center gap-1">
+          <Sparkles className="w-3.5 h-3.5 text-indigo-500" />
+          Formats:
+        </span>
+        <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 font-bold text-[10px]">JPG</span>
+        <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 font-bold text-[10px]">PNG</span>
+        <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 font-bold text-[10px]">WEBP</span>
       </div>
     </div>
   );
