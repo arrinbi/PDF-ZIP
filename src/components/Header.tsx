@@ -1,5 +1,5 @@
 import React from 'react';
-import { ShieldCheck, FileImage, FileText, Archive } from 'lucide-react';
+import { ShieldCheck, FileImage, FileText, Archive, Scissors, Lock } from 'lucide-react';
 import type { ExportMode } from '../types';
 
 interface HeaderProps {
@@ -26,12 +26,12 @@ export const Header: React.FC<HeaderProps> = ({ exportMode, onExportModeChange }
         </div>
 
         <div className="flex items-center gap-3">
-          {/* Main Navigation [ PDF ] [ ZIP ] */}
-          <div className="inline-flex p-1 bg-slate-100 rounded-xl border border-slate-200 text-xs sm:text-sm font-semibold">
+          {/* Main Navigation [ PDF ] [ ZIP ] [ Split PDF ] [ Protect PDF ] */}
+          <div className="inline-flex p-1 bg-slate-100 rounded-xl border border-slate-200 text-xs sm:text-sm font-semibold overflow-x-auto">
             <button
               type="button"
               onClick={() => onExportModeChange('pdf')}
-              className={`px-3.5 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
+              className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
                 exportMode === 'pdf'
                   ? 'bg-white text-indigo-700 shadow-xs font-bold'
                   : 'text-slate-600 hover:text-slate-900'
@@ -43,7 +43,7 @@ export const Header: React.FC<HeaderProps> = ({ exportMode, onExportModeChange }
             <button
               type="button"
               onClick={() => onExportModeChange('zip')}
-              className={`px-3.5 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
+              className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
                 exportMode === 'zip'
                   ? 'bg-white text-indigo-700 shadow-xs font-bold'
                   : 'text-slate-600 hover:text-slate-900'
@@ -51,6 +51,30 @@ export const Header: React.FC<HeaderProps> = ({ exportMode, onExportModeChange }
             >
               <Archive className="w-4 h-4" />
               <span>ZIP</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => onExportModeChange('split')}
+              className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
+                exportMode === 'split'
+                  ? 'bg-white text-indigo-700 shadow-xs font-bold'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <Scissors className="w-4 h-4" />
+              <span>Split PDF</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => onExportModeChange('protect')}
+              className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
+                exportMode === 'protect'
+                  ? 'bg-white text-indigo-700 shadow-xs font-bold'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <Lock className="w-4 h-4" />
+              <span>Protect PDF</span>
             </button>
           </div>
 
