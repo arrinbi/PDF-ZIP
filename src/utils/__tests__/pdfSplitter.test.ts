@@ -59,7 +59,7 @@ describe('pdfSplitter utility', () => {
   });
 
   describe('splitPdfByRanges', () => {
-    it('returns single PDF result when only 1 range is provided', async () => {
+    it('returns single PDF result with ZIP archive when only 1 range is provided', async () => {
       const result = await splitPdfByRanges(samplePdfBytes, [[0, 1]], 'my_doc');
 
       expect(result.isSingle).toBe(true);
@@ -67,9 +67,20 @@ describe('pdfSplitter utility', () => {
       expect(result.pdf?.pageCount).toBe(2);
       expect(result.pdf?.filename).toContain('my_doc_pages_1-2.pdf');
 
+      // Verify ZIP archive is generated for single file
+      expect(result.zip).toBeDefined();
+      expect(result.zip?.filename).toBe('my_doc_split.zip');
+
       // Verify created PDF has 2 pages
       const resDoc = await PDFDocument.load(await result.pdf!.blob.arrayBuffer());
       expect(resDoc.getPageCount()).toBe(2);
+    });
+
+    it('uses split_pdf.zip as filename when baseFilename is split_pdf', async () => {
+      const result = await splitPdfByRanges(samplePdfBytes, [[0]], 'split_pdf');
+
+      expect(result.zip).toBeDefined();
+      expect(result.zip?.filename).toBe('split_pdf.zip');
     });
 
     it('returns ZIP archive and file list when multiple ranges are provided', async () => {
