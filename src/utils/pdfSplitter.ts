@@ -68,11 +68,11 @@ export function parsePageRanges(rangeStr: string, totalPages: number): number[][
 export async function splitPdfByRanges(
   fileOrBuffer: File | ArrayBuffer | Uint8Array,
   ranges: number[][],
-  rawBaseFilename: string = 'split_document'
+  rawBaseFilename: string = 'split_pdf'
 ): Promise<SplitPdfResult> {
   const buffer = fileOrBuffer instanceof File ? await fileOrBuffer.arrayBuffer() : fileOrBuffer;
   const srcDoc = await PDFDocument.load(buffer);
-  const baseFilename = sanitizeFilename(rawBaseFilename, 'split_document').replace(/\.pdf$/i, '');
+  const baseFilename = sanitizeFilename(rawBaseFilename, 'split_pdf').replace(/\.pdf$/i, '');
 
   const items: SplitResultItem[] = [];
 
@@ -118,15 +118,7 @@ export async function splitPdfByRanges(
 
   const isSingle = items.length === 1;
 
-  if (isSingle) {
-    return {
-      isSingle: true,
-      pdf: items[0],
-      files: items,
-    };
-  }
-
-  // Create ZIP archive for multiple split files
+  // Create ZIP archive for split files
   const zip = new JSZip();
   items.forEach((item) => {
     zip.file(item.filename, item.blob);
@@ -134,10 +126,11 @@ export async function splitPdfByRanges(
 
   const zipBlob = await zip.generateAsync({ type: 'blob' });
   const zipUrl = URL.createObjectURL(zipBlob);
-  const zipFilename = `${baseFilename}_split.zip`;
+  const zipFilename = baseFilename === 'split_pdf' ? 'split_pdf.zip' : `${baseFilename}_split.zip`;
 
   return {
-    isSingle: false,
+    isSingle,
+    pdf: isSingle ? items[0] : undefined,
     zip: {
       blob: zipBlob,
       url: zipUrl,

@@ -280,7 +280,8 @@ export const SplitPdf: React.FC = () => {
           </div>
 
           <div className="max-w-md mx-auto space-y-3">
-            {splitResult.isSingle && splitResult.pdf ? (
+            {/* If single PDF generated, show Download PDF button */}
+            {splitResult.isSingle && splitResult.pdf && (
               <a
                 href={splitResult.pdf.url}
                 download={splitResult.pdf.filename}
@@ -289,17 +290,22 @@ export const SplitPdf: React.FC = () => {
                 <Download className="w-4 h-4" />
                 <span>Download PDF ({formatBytes(splitResult.pdf.sizeBytes)})</span>
               </a>
-            ) : (
-              splitResult.zip && (
-                <a
-                  href={splitResult.zip.url}
-                  download={splitResult.zip.filename}
-                  className="w-full py-3 px-5 bg-indigo-600 hover:bg-indigo-700 active:scale-98 text-white font-semibold text-sm rounded-xl shadow-md shadow-indigo-200 transition-all flex items-center justify-center gap-2"
-                >
-                  <Archive className="w-4 h-4" />
-                  <span>Download ZIP Archive ({formatBytes(splitResult.zip.sizeBytes)})</span>
-                </a>
-              )
+            )}
+
+            {/* ZIP download option available for both single and multiple PDF split results */}
+            {splitResult.zip && (
+              <a
+                href={splitResult.zip.url}
+                download={splitResult.zip.filename}
+                className={`w-full py-3 px-5 text-white font-semibold text-sm rounded-xl transition-all flex items-center justify-center gap-2 ${
+                  splitResult.isSingle
+                    ? 'bg-slate-800 hover:bg-slate-900 shadow-md shadow-slate-200 active:scale-98'
+                    : 'bg-indigo-600 hover:bg-indigo-700 shadow-md shadow-indigo-200 active:scale-98'
+                }`}
+              >
+                <Archive className="w-4 h-4" />
+                <span>Download ZIP Archive ({formatBytes(splitResult.zip.sizeBytes)})</span>
+              </a>
             )}
 
             {/* List of generated split files */}
