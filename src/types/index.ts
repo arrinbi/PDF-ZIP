@@ -23,7 +23,44 @@ export type OutputFormat = 'JPG' | 'PNG';
 
 export type ZipOutputFormat = 'ORIGINAL' | 'JPG' | 'PNG' | 'WEBP';
 
-export type ExportMode = 'pdf' | 'zip' | 'split' | 'protect';
+export type ExportMode = 'pdf' | 'zip' | 'split' | 'protect' | 'hd-raw';
+
+export type HdScaleFactor = 2 | 4;
+
+export type HdOutputFormat = 'SAME' | 'JPG' | 'PNG' | 'WEBP';
+
+export interface HdUpscaleOptions {
+  scaleFactor: HdScaleFactor; // 2 or 4
+  outputFormat: HdOutputFormat; // SAME, JPG, PNG, WEBP
+  quality?: number; // 0.80 to 1.00
+}
+
+export interface HdItemResult {
+  id: string;
+  fileName: string;
+  outputFileName: string;
+  originalWidth: number;
+  originalHeight: number;
+  originalSize: number;
+  upscaledWidth: number;
+  upscaledHeight: number;
+  upscaledSize: number;
+  originalPreviewUrl: string;
+  upscaledPreviewUrl: string;
+  blob: Blob;
+  status: 'pending' | 'processing' | 'done' | 'error';
+  errorMessage?: string;
+}
+
+export interface HdBatchSummary {
+  totalFiles: number;
+  successCount: number;
+  errorCount: number;
+  results: HdItemResult[];
+  zipBlob?: Blob;
+  zipUrl?: string;
+  zipFileName?: string;
+}
 
 export type SplitMode = 'range' | 'every_page' | 'select';
 
