@@ -175,6 +175,8 @@ export async function processBatchFolder(
       filename: batch.folderName,
       outputFormat: options.pdfOptions?.outputFormat ?? 'JPG',
       quality: options.pdfOptions?.quality ?? 0.85,
+      isPasswordProtected: options.pdfOptions?.isPasswordProtected,
+      password: options.pdfOptions?.password,
     };
     const pdfResult = await generatePdfFromImages(batch.images, pdfOpts, onProgress);
     return { mode: 'pdf', pdf: pdfResult };

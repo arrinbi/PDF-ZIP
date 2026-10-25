@@ -1,4 +1,5 @@
 import jsPDF from 'jspdf';
+import { encryptPDF } from '@pdfsmaller/pdf-encrypt';
 import type { GeneratedPdfResult, ImageItem, PdfOptions } from '../types';
 import { processImageForPdf, DEFAULT_QUALITY } from './imageOptimizer';
 
@@ -91,7 +92,21 @@ export async function generatePdfFromImages(
   }
 
   const pdfArrayBuffer = pdf.output('arraybuffer');
-  const blob = new Blob([pdfArrayBuffer], { type: 'application/pdf' });
+  let finalBytes: Uint8Array = new Uint8Array(pdfArrayBuffer);
+
+  if (options.isPasswordProtected) {
+    const pwd = options.password ? options.password.trim() : '';
+    if (!pwd) {
+      throw new Error('Password cannot be empty when password protection is enabled.');
+    }
+    try {
+      finalBytes = await encryptPDF(finalBytes, pwd, { ownerPassword: pwd });
+    } catch (err: any) {
+      throw new Error(err?.message || 'Failed to encrypt PDF file.');
+    }
+  }
+
+  const blob = new Blob([finalBytes.buffer as ArrayBuffer], { type: 'application/pdf' });
   const url = URL.createObjectURL(blob);
   const sizeBytes = blob.size;
 

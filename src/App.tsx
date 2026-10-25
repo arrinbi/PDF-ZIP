@@ -39,6 +39,8 @@ export const App: React.FC = () => {
   const [quality, setQuality] = useState<number>(0.85); // Default 85%
   const [pdfFilename, setPdfFilename] = useState<string>('converted_images');
   const [zipFilename, setZipFilename] = useState<string>('images');
+  const [isPdfPasswordProtected, setIsPdfPasswordProtected] = useState<boolean>(false);
+  const [pdfPassword, setPdfPassword] = useState<string>('');
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [progress, setProgress] = useState<ProcessingProgress>({
     stage: 'idle',
@@ -106,6 +108,12 @@ export const App: React.FC = () => {
 
     try {
       if (exportMode === 'pdf') {
+        if (isPdfPasswordProtected && !pdfPassword.trim()) {
+          setErrorMessage('Please enter a password for the PDF document.');
+          setIsProcessing(false);
+          return;
+        }
+
         setProgress({
           stage: 'generating',
           currentStep: 0,
@@ -119,6 +127,8 @@ export const App: React.FC = () => {
           filename: pdfFilename || 'converted_images',
           outputFormat,
           quality,
+          isPasswordProtected: isPdfPasswordProtected,
+          password: pdfPassword,
         };
 
         const result = await generatePdfFromImages(images, options, (curr, tot) => {
@@ -476,6 +486,32 @@ export const App: React.FC = () => {
                                 <p className="text-[10px] text-indigo-600 font-medium mt-1">
                                   PNG is lossless (quality disabled).
                                 </p>
+                              )}
+                            </div>
+
+                            {/* Password Protection Option */}
+                            <div className="pt-2 border-t border-slate-100 space-y-2">
+                              <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={isPdfPasswordProtected}
+                                  onChange={(e) => setIsPdfPasswordProtected(e.target.checked)}
+                                  className="w-4 h-4 text-indigo-600 rounded-md border-slate-300 focus:ring-indigo-500 cursor-pointer"
+                                />
+                                <Lock className="w-3.5 h-3.5 text-slate-500" />
+                                <span>Protect with Password</span>
+                              </label>
+
+                              {isPdfPasswordProtected && (
+                                <div className="space-y-1">
+                                  <input
+                                    type="password"
+                                    value={pdfPassword}
+                                    onChange={(e) => setPdfPassword(e.target.value)}
+                                    placeholder="Enter PDF password"
+                                    className="w-full px-3.5 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-hidden bg-slate-50/50 focus:bg-white transition-all text-slate-900"
+                                  />
+                                </div>
                               )}
                             </div>
                           </div>

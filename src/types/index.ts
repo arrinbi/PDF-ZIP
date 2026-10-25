@@ -61,6 +61,8 @@ export interface PdfOptions {
   filename?: string;
   outputFormat?: OutputFormat;
   quality?: number; // 0.50 to 1.00 (50% to 100%), default 0.85
+  isPasswordProtected?: boolean;
+  password?: string;
 }
 
 export interface ZipOptions {

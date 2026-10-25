@@ -147,4 +147,44 @@ describe('App Component', () => {
 
     expect(screen.queryByText(/Preview in Browser/i)).toBeNull();
   });
+
+  it('allows password protection to be enabled and requires password entry in Standard Mode', async () => {
+    render(<App />);
+
+    const file1 = new File(['fake data 1'], 'img1.png', { type: 'image/png' });
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+
+    if (input) {
+      fireEvent.change(input, { target: { files: [file1] } });
+    }
+
+    await waitFor(() => {
+      expect(screen.getByText(/Create PDF \(1\)/i)).toBeDefined();
+    });
+
+    // Check "Protect with Password"
+    const checkbox = screen.getByLabelText(/Protect with Password/i) as HTMLInputElement;
+    fireEvent.click(checkbox);
+    expect(checkbox.checked).toBe(true);
+
+    // Click Export without typing password
+    const exportButton = screen.getByText(/Create PDF \(1\)/i);
+    fireEvent.click(exportButton);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Please enter a password for the PDF document/i)).toBeDefined();
+    });
+
+    // Type password
+    const passwordInput = screen.getByPlaceholderText(/Enter PDF password/i);
+    fireEvent.change(passwordInput, { target: { value: 'myStandardPassword123' } });
+
+    // Click Export again
+    fireEvent.click(exportButton);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Your PDF is Ready!/i)).toBeDefined();
+      expect(screen.getByText(/Download PDF/i)).toBeDefined();
+    });
+  });
 });

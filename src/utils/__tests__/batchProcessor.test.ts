@@ -164,4 +164,35 @@ describe('batchProcessor utilities', () => {
       expect(result.zip.fileCount).toBe(1);
     }
   });
+
+  it('processes batch folder into password protected PDF export when option is enabled', async () => {
+    const batch = {
+      id: 'batch-3',
+      folderName: '03. Protected Folder',
+      images: [
+        {
+          id: '1',
+          file: new File(['img'], '01.jpg', { type: 'image/jpeg' }),
+          name: '01.jpg',
+          size: 100,
+          type: 'image/jpeg',
+          previewUrl: 'data:image/jpeg;base64,123',
+          width: 800,
+          height: 600,
+        },
+      ],
+    };
+
+    const result = await processBatchFolder(
+      batch,
+      'pdf',
+      { pdfOptions: { isPasswordProtected: true, password: 'batchPassword123' } }
+    );
+
+    expect(result.mode).toBe('pdf');
+    if (result.mode === 'pdf') {
+      expect(result.pdf.filename).toBe('03. Protected Folder.pdf');
+      expect(result.pdf.sizeBytes).toBeGreaterThan(0);
+    }
+  });
 });

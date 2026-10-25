@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
+import { PDFDocument } from 'pdf-lib';
 import { generatePdfFromImages, getImageFormat } from '../pdfGenerator';
 import type { ImageItem, PdfOptions } from '../../types';
 
@@ -130,5 +131,41 @@ describe('pdfGenerator utilities', () => {
     const result = await generatePdfFromImages(mixedImages, options);
     expect(result).toBeDefined();
     expect(result.pageCount).toBe(2);
+  });
+
+  it('generates an encrypted PDF when password protection is enabled', async () => {
+    const options: PdfOptions = {
+      pageSize: 'fit',
+      margin: 0,
+      filename: 'protected_doc',
+      isPasswordProtected: true,
+      password: 'secretPassword123',
+    };
+
+    const result = await generatePdfFromImages(sampleImages, options);
+    expect(result).toBeDefined();
+    expect(result.filename).toBe('protected_doc.pdf');
+    expect(result.sizeBytes).toBeGreaterThan(0);
+
+    const buffer = await result.blob.arrayBuffer();
+    // Loading encrypted PDF without password should throw error
+    await expect(PDFDocument.load(buffer)).rejects.toThrow();
+
+    // Loading encrypted PDF with ignoreEncryption or password should succeed
+    const pdfDoc = await PDFDocument.load(buffer, { ignoreEncryption: true });
+    expect(pdfDoc.getPageCount()).toBe(2);
+  });
+
+  it('throws an error if password protection is enabled with an empty password', async () => {
+    const options: PdfOptions = {
+      pageSize: 'fit',
+      margin: 0,
+      isPasswordProtected: true,
+      password: '   ',
+    };
+
+    await expect(generatePdfFromImages(sampleImages, options)).rejects.toThrow(
+      'Password cannot be empty when password protection is enabled.'
+    );
   });
 });
