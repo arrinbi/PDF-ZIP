@@ -133,14 +133,14 @@ export async function splitPdfByRanges(
     for (const indices of ranges) {
       for (const pageIdx of indices) {
         const pageNum = pageIdx + 1;
-        const imgFilename = `${baseFilename}_page_${pageNum}.png`;
+        const imgFilename = `${baseFilename}_page_${pageNum}.jpg`;
 
         if (addedFiles.has(imgFilename)) continue;
         addedFiles.add(imgFilename);
 
         try {
           const page = await pdfJsDoc.getPage(pageNum);
-          const viewport = page.getViewport({ scale: 2.0 });
+          const viewport = page.getViewport({ scale: 1.5 });
 
           if (typeof document !== 'undefined' && typeof HTMLCanvasElement !== 'undefined') {
             const canvas = document.createElement('canvas');
@@ -149,8 +149,10 @@ export async function splitPdfByRanges(
             const ctx = canvas.getContext('2d');
 
             if (ctx) {
+              ctx.fillStyle = '#ffffff';
+              ctx.fillRect(0, 0, canvas.width, canvas.height);
               await page.render({ canvasContext: ctx, viewport }).promise;
-              const dataUrl = canvas.toDataURL('image/png');
+              const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
               const base64Data = dataUrl.includes(',') ? dataUrl.split(',')[1] : dataUrl;
               zip.file(imgFilename, base64Data, { base64: true });
 
