@@ -22,6 +22,20 @@ describe('ProtectPdf Component', () => {
         };
       }
     );
+    vi.spyOn(pdfProtector, 'unlockPdfWithPassword').mockImplementation(
+      async (file, password, filename) => {
+        if (password === 'wrong') {
+          throw new Error('Incorrect password. Please verify the password and try again.');
+        }
+        const fileName = file instanceof File ? file.name : 'file';
+        return {
+          blob: new Blob([`unlocked content for ${fileName}`]),
+          url: 'blob:mock-unlock-url',
+          sizeBytes: 1024,
+          filename: `${filename}.pdf`,
+        };
+      }
+    );
   });
 
   it('renders initial dropzone state', () => {
@@ -142,5 +156,94 @@ describe('ProtectPdf Component', () => {
     });
 
     expect(pdfProtector.protectPdfWithPassword).not.toHaveBeenCalled();
+  });
+
+  it('allows switching action mode to Unlock PDF and renders unlock UI controls without confirm password fields', async () => {
+    render(<ProtectPdf />);
+
+    const unlockBtn = screen.getByRole('button', { name: /Unlock PDF/i });
+    fireEvent.click(unlockBtn);
+
+    expect(screen.getByText(/Upload PDF Files to Unlock/i)).toBeDefined();
+
+    const pdfFile = new File(['fake encrypted pdf'], 'secret_doc.pdf', { type: 'application/pdf' });
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+
+    fireEvent.change(input, { target: { files: [pdfFile] } });
+
+    await waitFor(() => {
+      expect(screen.getByText(/1. secret_doc.pdf/i)).toBeDefined();
+    });
+
+    // Verify Password input exists, Confirm Password input does NOT exist
+    expect(screen.getByPlaceholderText('Enter opening password')).toBeDefined();
+    expect(screen.queryByPlaceholderText('Confirm password')).toBeNull();
+    expect(screen.getByDisplayValue('secret_doc_unlocked')).toBeDefined();
+  });
+
+  it('unlocks multiple files with independent passwords in one operation', async () => {
+    render(<ProtectPdf />);
+
+    const unlockBtn = screen.getByRole('button', { name: /Unlock PDF/i });
+    fireEvent.click(unlockBtn);
+
+    const file1 = new File(['encrypted pdf 1'], 'file1.pdf', { type: 'application/pdf' });
+    const file2 = new File(['encrypted pdf 2'], 'file2.pdf', { type: 'application/pdf' });
+
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    fireEvent.change(input, { target: { files: [file1, file2] } });
+
+    await waitFor(() => {
+      expect(screen.getByText(/Selected PDF Files \(2\)/i)).toBeDefined();
+    });
+
+    const pwdInputs = screen.getAllByPlaceholderText('Enter opening password');
+    expect(pwdInputs.length).toBe(2);
+
+    fireEvent.change(pwdInputs[0], { target: { value: 'passA' } });
+    fireEvent.change(pwdInputs[1], { target: { value: 'passB' } });
+
+    const submitBtn = screen.getByRole('button', { name: /Unlock 2 PDFs/i });
+    fireEvent.click(submitBtn);
+
+    await waitFor(() => {
+      expect(screen.getByText(/PDF Unlock Complete!/i)).toBeDefined();
+      expect(screen.getByText(/file1_unlocked.pdf/i)).toBeDefined();
+      expect(screen.getByText(/file2_unlocked.pdf/i)).toBeDefined();
+    });
+
+    expect(pdfProtector.unlockPdfWithPassword).toHaveBeenCalledTimes(2);
+    expect(pdfProtector.unlockPdfWithPassword).toHaveBeenNthCalledWith(1, file1, 'passA', 'file1_unlocked');
+    expect(pdfProtector.unlockPdfWithPassword).toHaveBeenNthCalledWith(2, file2, 'passB', 'file2_unlocked');
+  });
+
+  it('handles per-file unlock errors independently', async () => {
+    render(<ProtectPdf />);
+
+    const unlockBtn = screen.getByRole('button', { name: /Unlock PDF/i });
+    fireEvent.click(unlockBtn);
+
+    const file1 = new File(['encrypted pdf 1'], 'valid.pdf', { type: 'application/pdf' });
+    const file2 = new File(['encrypted pdf 2'], 'invalid_pwd.pdf', { type: 'application/pdf' });
+
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    fireEvent.change(input, { target: { files: [file1, file2] } });
+
+    await waitFor(() => {
+      expect(screen.getByText(/Selected PDF Files \(2\)/i)).toBeDefined();
+    });
+
+    const pwdInputs = screen.getAllByPlaceholderText('Enter opening password');
+    fireEvent.change(pwdInputs[0], { target: { value: 'pass123' } });
+    fireEvent.change(pwdInputs[1], { target: { value: 'wrong' } });
+
+    const submitBtn = screen.getByRole('button', { name: /Unlock 2 PDFs/i });
+    fireEvent.click(submitBtn);
+
+    await waitFor(() => {
+      expect(screen.getByText(/PDF Unlock Complete!/i)).toBeDefined();
+      expect(screen.getByText(/valid_unlocked.pdf/i)).toBeDefined();
+      expect(screen.getByText(/Incorrect password. Please verify the password and try again./i)).toBeDefined();
+    });
   });
 });
