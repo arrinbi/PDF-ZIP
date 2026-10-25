@@ -175,11 +175,29 @@ describe('App Component', () => {
       expect(screen.getByText(/Please enter a password for the PDF document/i)).toBeDefined();
     });
 
-    // Type password
+    // Type password without confirmation
     const passwordInput = screen.getByPlaceholderText(/Enter PDF password/i);
     fireEvent.change(passwordInput, { target: { value: 'myStandardPassword123' } });
 
-    // Click Export again
+    fireEvent.click(exportButton);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Please confirm the password for the PDF document/i)).toBeDefined();
+    });
+
+    // Type mismatched confirm password
+    const confirmInput = screen.getByPlaceholderText(/Confirm PDF password/i);
+    fireEvent.change(confirmInput, { target: { value: 'mismatched' } });
+
+    fireEvent.click(exportButton);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Passwords do not match/i)).toBeDefined();
+    });
+
+    // Type matching confirm password
+    fireEvent.change(confirmInput, { target: { value: 'myStandardPassword123' } });
+
     fireEvent.click(exportButton);
 
     await waitFor(() => {

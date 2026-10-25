@@ -41,6 +41,7 @@ export const App: React.FC = () => {
   const [zipFilename, setZipFilename] = useState<string>('images');
   const [isPdfPasswordProtected, setIsPdfPasswordProtected] = useState<boolean>(false);
   const [pdfPassword, setPdfPassword] = useState<string>('');
+  const [pdfConfirmPassword, setPdfConfirmPassword] = useState<string>('');
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [progress, setProgress] = useState<ProcessingProgress>({
     stage: 'idle',
@@ -108,10 +109,22 @@ export const App: React.FC = () => {
 
     try {
       if (exportMode === 'pdf') {
-        if (isPdfPasswordProtected && !pdfPassword.trim()) {
-          setErrorMessage('Please enter a password for the PDF document.');
-          setIsProcessing(false);
-          return;
+        if (isPdfPasswordProtected) {
+          if (!pdfPassword.trim()) {
+            setErrorMessage('Please enter a password for the PDF document.');
+            setIsProcessing(false);
+            return;
+          }
+          if (!pdfConfirmPassword.trim()) {
+            setErrorMessage('Please confirm the password for the PDF document.');
+            setIsProcessing(false);
+            return;
+          }
+          if (pdfPassword !== pdfConfirmPassword) {
+            setErrorMessage('Passwords do not match. Please ensure both fields are identical.');
+            setIsProcessing(false);
+            return;
+          }
         }
 
         setProgress({
@@ -503,12 +516,19 @@ export const App: React.FC = () => {
                               </label>
 
                               {isPdfPasswordProtected && (
-                                <div className="space-y-1">
+                                <div className="space-y-2 pt-1">
                                   <input
                                     type="password"
                                     value={pdfPassword}
                                     onChange={(e) => setPdfPassword(e.target.value)}
                                     placeholder="Enter PDF password"
+                                    className="w-full px-3.5 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-hidden bg-slate-50/50 focus:bg-white transition-all text-slate-900"
+                                  />
+                                  <input
+                                    type="password"
+                                    value={pdfConfirmPassword}
+                                    onChange={(e) => setPdfConfirmPassword(e.target.value)}
+                                    placeholder="Confirm PDF password"
                                     className="w-full px-3.5 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-hidden bg-slate-50/50 focus:bg-white transition-all text-slate-900"
                                   />
                                 </div>

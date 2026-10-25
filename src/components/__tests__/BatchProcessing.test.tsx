@@ -214,6 +214,27 @@ describe('BatchProcessing Component', () => {
     expect(passwordInputs.length).toBe(1);
     fireEvent.change(passwordInputs[0], { target: { value: 'secretBatchPass1' } });
 
+    // Click process without confirmation
+    fireEvent.click(processButton);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Please confirm the password for protected folder "Folder 1"/i)).toBeDefined();
+    });
+
+    // Enter mismatched confirm password
+    const confirmInputs = screen.getAllByPlaceholderText(/Confirm PDF password/i);
+    expect(confirmInputs.length).toBe(1);
+    fireEvent.change(confirmInputs[0], { target: { value: 'mismatched' } });
+
+    fireEvent.click(processButton);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Passwords do not match for protected folder "Folder 1"/i)).toBeDefined();
+    });
+
+    // Enter matching confirm password
+    fireEvent.change(confirmInputs[0], { target: { value: 'secretBatchPass1' } });
+
     // Process selected folders
     fireEvent.click(processButton);
 

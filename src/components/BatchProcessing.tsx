@@ -42,9 +42,10 @@ export const BatchProcessing: React.FC<BatchProcessingProps> = ({ exportMode = '
   // Mapping subfolder ID -> customized output filename
   const [customOutputNames, setCustomOutputNames] = useState<Record<string, string>>({});
 
-  // Password protection mapping subfolder ID -> isProtected / password
+  // Password protection mapping subfolder ID -> isProtected / password / confirmPassword
   const [subfolderPasswordProtected, setSubfolderPasswordProtected] = useState<Record<string, boolean>>({});
   const [subfolderPasswords, setSubfolderPasswords] = useState<Record<string, string>>({});
+  const [subfolderConfirmPasswords, setSubfolderConfirmPasswords] = useState<Record<string, string>>({});
 
   const [outputFormat, setOutputFormat] = useState<OutputFormat>('JPG');
   const [zipOutputFormat, setZipOutputFormat] = useState<ZipOutputFormat>('ORIGINAL');
@@ -76,6 +77,7 @@ export const BatchProcessing: React.FC<BatchProcessingProps> = ({ exportMode = '
       setCustomOutputNames({});
       setSubfolderPasswordProtected({});
       setSubfolderPasswords({});
+      setSubfolderConfirmPasswords({});
     } else {
       setParentFolderName(scanResult.parentFolderName);
       setDiscoveredSubfolders(scanResult.subfolders);
@@ -122,6 +124,7 @@ export const BatchProcessing: React.FC<BatchProcessingProps> = ({ exportMode = '
     setCustomOutputNames({});
     setSubfolderPasswordProtected({});
     setSubfolderPasswords({});
+    setSubfolderConfirmPasswords({});
     setBatchResults([]);
     setErrorMessage(null);
   };
@@ -135,6 +138,13 @@ export const BatchProcessing: React.FC<BatchProcessingProps> = ({ exportMode = '
 
   const handleSubfolderPasswordChange = (id: string, pwd: string) => {
     setSubfolderPasswords((prev) => ({
+      ...prev,
+      [id]: pwd,
+    }));
+  };
+
+  const handleSubfolderConfirmPasswordChange = (id: string, pwd: string) => {
+    setSubfolderConfirmPasswords((prev) => ({
       ...prev,
       [id]: pwd,
     }));
@@ -190,8 +200,17 @@ export const BatchProcessing: React.FC<BatchProcessingProps> = ({ exportMode = '
       for (const sf of selectedFolders) {
         if (subfolderPasswordProtected[sf.id]) {
           const pwd = (subfolderPasswords[sf.id] || '').trim();
+          const confirmPwd = (subfolderConfirmPasswords[sf.id] || '').trim();
           if (!pwd) {
             setErrorMessage(`Please enter a password for protected folder "${sf.name}".`);
+            return;
+          }
+          if (!confirmPwd) {
+            setErrorMessage(`Please confirm the password for protected folder "${sf.name}".`);
+            return;
+          }
+          if (subfolderPasswords[sf.id] !== subfolderConfirmPasswords[sf.id]) {
+            setErrorMessage(`Passwords do not match for protected folder "${sf.name}".`);
             return;
           }
         }
@@ -730,16 +749,28 @@ export const BatchProcessing: React.FC<BatchProcessingProps> = ({ exportMode = '
                               </label>
 
                               {subfolderPasswordProtected[sf.id] && (
-                                <input
-                                  id={`password-${sf.id}`}
-                                  type="password"
-                                  value={subfolderPasswords[sf.id] || ''}
-                                  onChange={(e) =>
-                                    handleSubfolderPasswordChange(sf.id, e.target.value)
-                                  }
-                                  placeholder="Enter PDF password"
-                                  className="px-3 py-1 text-xs border border-slate-300 rounded-xl bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-hidden min-w-[180px] max-w-full text-slate-900 font-medium"
-                                />
+                                <>
+                                  <input
+                                    id={`password-${sf.id}`}
+                                    type="password"
+                                    value={subfolderPasswords[sf.id] || ''}
+                                    onChange={(e) =>
+                                      handleSubfolderPasswordChange(sf.id, e.target.value)
+                                    }
+                                    placeholder="Enter PDF password"
+                                    className="px-3 py-1 text-xs border border-slate-300 rounded-xl bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-hidden min-w-[180px] max-w-full text-slate-900 font-medium"
+                                  />
+                                  <input
+                                    id={`confirm-password-${sf.id}`}
+                                    type="password"
+                                    value={subfolderConfirmPasswords[sf.id] || ''}
+                                    onChange={(e) =>
+                                      handleSubfolderConfirmPasswordChange(sf.id, e.target.value)
+                                    }
+                                    placeholder="Confirm PDF password"
+                                    className="px-3 py-1 text-xs border border-slate-300 rounded-xl bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-hidden min-w-[180px] max-w-full text-slate-900 font-medium"
+                                  />
+                                </>
                               )}
                             </div>
                           )}
