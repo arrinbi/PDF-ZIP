@@ -27,6 +27,7 @@ import {
   Square,
   FolderTree,
   RotateCcw,
+  Lock,
 } from 'lucide-react';
 
 interface BatchProcessingProps {
@@ -40,6 +41,10 @@ export const BatchProcessing: React.FC<BatchProcessingProps> = ({ exportMode = '
 
   // Mapping subfolder ID -> customized output filename
   const [customOutputNames, setCustomOutputNames] = useState<Record<string, string>>({});
+
+  // Password protection mapping subfolder ID -> isProtected / password
+  const [subfolderPasswordProtected, setSubfolderPasswordProtected] = useState<Record<string, boolean>>({});
+  const [subfolderPasswords, setSubfolderPasswords] = useState<Record<string, string>>({});
 
   const [outputFormat, setOutputFormat] = useState<OutputFormat>('JPG');
   const [zipOutputFormat, setZipOutputFormat] = useState<ZipOutputFormat>('ORIGINAL');
@@ -69,6 +74,8 @@ export const BatchProcessing: React.FC<BatchProcessingProps> = ({ exportMode = '
       setDiscoveredSubfolders([]);
       setSelectedFolderIds(new Set());
       setCustomOutputNames({});
+      setSubfolderPasswordProtected({});
+      setSubfolderPasswords({});
     } else {
       setParentFolderName(scanResult.parentFolderName);
       setDiscoveredSubfolders(scanResult.subfolders);
@@ -81,6 +88,8 @@ export const BatchProcessing: React.FC<BatchProcessingProps> = ({ exportMode = '
         initialNames[sf.id] = sf.name;
       });
       setCustomOutputNames(initialNames);
+      setSubfolderPasswordProtected({});
+      setSubfolderPasswords({});
     }
 
     e.target.value = ''; // Reset input element
@@ -111,8 +120,24 @@ export const BatchProcessing: React.FC<BatchProcessingProps> = ({ exportMode = '
     setDiscoveredSubfolders([]);
     setSelectedFolderIds(new Set());
     setCustomOutputNames({});
+    setSubfolderPasswordProtected({});
+    setSubfolderPasswords({});
     setBatchResults([]);
     setErrorMessage(null);
+  };
+
+  const handleToggleSubfolderPassword = (id: string, enabled: boolean) => {
+    setSubfolderPasswordProtected((prev) => ({
+      ...prev,
+      [id]: enabled,
+    }));
+  };
+
+  const handleSubfolderPasswordChange = (id: string, pwd: string) => {
+    setSubfolderPasswords((prev) => ({
+      ...prev,
+      [id]: pwd,
+    }));
   };
 
   const handleOutputNameChange = (id: string, newName: string) => {
@@ -161,6 +186,18 @@ export const BatchProcessing: React.FC<BatchProcessingProps> = ({ exportMode = '
       return;
     }
 
+    if (exportMode === 'pdf') {
+      for (const sf of selectedFolders) {
+        if (subfolderPasswordProtected[sf.id]) {
+          const pwd = (subfolderPasswords[sf.id] || '').trim();
+          if (!pwd) {
+            setErrorMessage(`Please enter a password for protected folder "${sf.name}".`);
+            return;
+          }
+        }
+      }
+    }
+
     setIsProcessing(true);
     setErrorMessage(null);
     setBatchResults([]);
@@ -189,11 +226,20 @@ export const BatchProcessing: React.FC<BatchProcessingProps> = ({ exportMode = '
             throw new Error(`No valid images found in "${sanitizedOutputName}".`);
           }
 
+          const isProtected = exportMode === 'pdf' && !!subfolderPasswordProtected[subfolder.id];
+          const pwd = subfolderPasswords[subfolder.id] || '';
+
           const res = await processBatchFolder(
             batchFolder,
             exportMode,
             {
-              pdfOptions: { margin: 0, outputFormat, quality },
+              pdfOptions: {
+                margin: 0,
+                outputFormat,
+                quality,
+                isPasswordProtected: isProtected,
+                password: pwd,
+              },
               zipOptions: { outputFormat: zipOutputFormat, quality },
             },
             (curr, tot) => {
@@ -660,6 +706,43 @@ export const BatchProcessing: React.FC<BatchProcessingProps> = ({ exportMode = '
                               placeholder="Enter output name"
                             />
                           </div>
+
+                          {exportMode === 'pdf' && (
+                            <div
+                              className="flex flex-wrap items-center gap-3 pt-1"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <label
+                                htmlFor={`protect-${sf.id}`}
+                                className="flex items-center gap-1.5 text-xs font-semibold text-slate-700 cursor-pointer"
+                              >
+                                <input
+                                  id={`protect-${sf.id}`}
+                                  type="checkbox"
+                                  checked={!!subfolderPasswordProtected[sf.id]}
+                                  onChange={(e) =>
+                                    handleToggleSubfolderPassword(sf.id, e.target.checked)
+                                  }
+                                  className="w-3.5 h-3.5 text-indigo-600 rounded-md border-slate-300 focus:ring-indigo-500 cursor-pointer"
+                                />
+                                <Lock className="w-3.5 h-3.5 text-slate-500" />
+                                <span>Password Protect</span>
+                              </label>
+
+                              {subfolderPasswordProtected[sf.id] && (
+                                <input
+                                  id={`password-${sf.id}`}
+                                  type="password"
+                                  value={subfolderPasswords[sf.id] || ''}
+                                  onChange={(e) =>
+                                    handleSubfolderPasswordChange(sf.id, e.target.value)
+                                  }
+                                  placeholder="Enter PDF password"
+                                  className="px-3 py-1 text-xs border border-slate-300 rounded-xl bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-hidden min-w-[180px] max-w-full text-slate-900 font-medium"
+                                />
+                              )}
+                            </div>
+                          )}
                         </div>
                       </div>
 

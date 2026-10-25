@@ -178,4 +178,50 @@ describe('BatchProcessing Component', () => {
     expect(downloadButtons.length).toBeGreaterThan(0);
     expect(screen.getByText('Final Document Name')).toBeDefined();
   });
+
+  it('allows independent per-subfolder password protection settings and validates passwords in Batch Mode', async () => {
+    const files = [
+      createWebkitFile('01.jpg', 'Manga/Folder 1/01.jpg'),
+      createWebkitFile('01.jpg', 'Manga/Folder 2/01.jpg'),
+    ];
+
+    render(<BatchProcessing />);
+
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    fireEvent.change(input, { target: { files } });
+
+    await waitFor(() => {
+      expect(screen.getByDisplayValue('Folder 1')).toBeDefined();
+      expect(screen.getByDisplayValue('Folder 2')).toBeDefined();
+    });
+
+    // Check Password Protect for Folder 1
+    const protectCheckboxes = screen.getAllByLabelText(/Password Protect/i) as HTMLInputElement[];
+    expect(protectCheckboxes.length).toBe(2);
+
+    fireEvent.click(protectCheckboxes[0]); // Protect Folder 1
+
+    // Click Process without typing password for Folder 1
+    const processButton = screen.getByText(/Process Selected Folders \(2 PDFs\)/i);
+    fireEvent.click(processButton);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Please enter a password for protected folder "Folder 1"/i)).toBeDefined();
+    });
+
+    // Enter password for Folder 1
+    const passwordInputs = screen.getAllByPlaceholderText(/Enter PDF password/i);
+    expect(passwordInputs.length).toBe(1);
+    fireEvent.change(passwordInputs[0], { target: { value: 'secretBatchPass1' } });
+
+    // Process selected folders
+    fireEvent.click(processButton);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Batch Processing Complete/i)).toBeDefined();
+    }, { timeout: 10000 });
+
+    expect(screen.getByText('Folder 1')).toBeDefined();
+    expect(screen.getByText('Folder 2')).toBeDefined();
+  });
 });
