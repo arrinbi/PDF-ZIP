@@ -133,7 +133,8 @@ export async function splitPdfByRanges(
     for (const indices of ranges) {
       for (const pageIdx of indices) {
         const pageNum = pageIdx + 1;
-        const imgFilename = `${baseFilename}_page_${pageNum}.jpg`;
+        const formattedPageNum = String(pageNum).padStart(2, '0');
+        const imgFilename = `${baseFilename}_page_${formattedPageNum}.jpg`;
 
         if (addedFiles.has(imgFilename)) continue;
         addedFiles.add(imgFilename);
