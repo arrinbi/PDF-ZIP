@@ -85,64 +85,54 @@ export async function ensureTfBackend(): Promise<string> {
 }
 
 /**
- * Compiles a Sub-Pixel Convolution Neural Network model for illustration super-resolution.
+ * Constructs local static and CDN URLs for a given model and scale factor.
  */
-function createFallbackSubPixelModel(scale: HdScaleFactor): tf.LayersModel {
-  const input = tf.input({ shape: [null, null, 3] });
-
-  const c1 = tf.layers
-    .conv2d({
-      filters: 32,
-      kernelSize: 3,
-      padding: 'same',
-      activation: 'relu',
-      kernelInitializer: 'glorotNormal',
-    })
-    .apply(input) as tf.SymbolicTensor;
-
-  const c2 = tf.layers
-    .conv2d({
-      filters: 32,
-      kernelSize: 3,
-      padding: 'same',
-      activation: 'relu',
-      kernelInitializer: 'glorotNormal',
-    })
-    .apply(c1) as tf.SymbolicTensor;
-
-  const c3 = tf.layers
-    .conv2d({
-      filters: 3 * scale * scale,
-      kernelSize: 3,
-      padding: 'same',
-      activation: 'sigmoid',
-      kernelInitializer: 'glorotNormal',
-    })
-    .apply(c2) as tf.SymbolicTensor;
-
-  return tf.model({ inputs: input, outputs: c3 });
+function getModelUrls(
+  scale: HdScaleFactor,
+  modelName: 'esrgan-medium' | 'esrgan-slim'
+): string[] {
+  const baseUrl = import.meta.env?.BASE_URL || '/';
+  const cleanBase = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
+  const localUrl = `${cleanBase}models/${modelName}/x${scale}/model.json`;
+  const cdnUrl = `https://cdn.jsdelivr.net/npm/@upscalerjs/${modelName}@1.0.0/models/x${scale}/model.json`;
+  return [localUrl, cdnUrl];
 }
 
 /**
- * Loads or returns pre-trained ESRGAN AI Super Resolution Model with timeout, warmup, and fallback.
+ * Loads or returns pre-trained ESRGAN AI Super Resolution Model with timeout, warmup, and caching.
+ * Prioritizes ESRGAN Medium (Residual Dense Network with 10 dense blocks) for high-detail manhwa upscale.
  */
 async function loadOrGetAiModel(scale: HdScaleFactor): Promise<tf.LayersModel> {
   if (scale === 2 && cachedEsrgan2x) return cachedEsrgan2x;
   if (scale === 4 && cachedEsrgan4x) return cachedEsrgan4x;
 
-  const modelUrl = `https://cdn.jsdelivr.net/npm/@upscalerjs/esrgan-slim@1.0.0/models/x${scale}/model.json`;
+  const candidates = [
+    ...getModelUrls(scale, 'esrgan-medium'),
+    ...getModelUrls(scale, 'esrgan-slim'),
+  ];
 
-  let model: tf.LayersModel;
-  try {
-    const loadPromise = tf.loadLayersModel(modelUrl);
-    const timeoutPromise = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error('Pemuatan model AI timeout.')), 6000)
+  let model: tf.LayersModel | null = null;
+  let lastError: any = null;
+
+  for (const url of candidates) {
+    try {
+      const loadPromise = tf.loadLayersModel(url);
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('Pemuatan model AI timeout.')), 8000)
+      );
+
+      model = await Promise.race([loadPromise, timeoutPromise]);
+      if (model) break;
+    } catch (err) {
+      lastError = err;
+      console.warn(`Gagal memuat model AI dari ${url}:`, err);
+    }
+  }
+
+  if (!model) {
+    throw new Error(
+      `Gagal memuat model AI Super Resolution (${lastError?.message || 'Network error'}). Pastikan perangkat mendukung WebGL.`
     );
-
-    model = await Promise.race([loadPromise, timeoutPromise]);
-  } catch (err) {
-    console.warn(`Model loading fallback for scale ${scale}:`, err);
-    model = createFallbackSubPixelModel(scale);
   }
 
   // Pre-warm model execution to compile WebGL shaders upfront
@@ -161,6 +151,7 @@ async function loadOrGetAiModel(scale: HdScaleFactor): Promise<tf.LayersModel> {
 
   if (scale === 2) cachedEsrgan2x = model;
   else cachedEsrgan4x = model;
+
   return model;
 }
 
@@ -230,7 +221,7 @@ function canvasToBlob(
 
 /**
  * Performs AI Super Resolution on a single image file or Blob using TensorFlow.js.
- * Uses overlapping tile stitching with optimal 512px tile size and canvas reuse.
+ * Uses overlapping tile stitching with optimal 256px tile size and 16px overlap context.
  */
 export async function upscaleImageWithAi(
   file: File | Blob,
@@ -303,19 +294,14 @@ export async function upscaleImageWithAi(
     dstCtx.imageSmoothingEnabled = true;
     dstCtx.imageSmoothingQuality = 'high';
 
-    // Tiling parameters: 512px tile size for 4x faster processing while preserving quality
-    const tileSize = 512;
-    const overlap = 8; // 8px overlap context around tiles
+    // Tiling parameters: 256px tile size with 16px overlap padding for high GPU performance and no grid seams
+    const tileSize = 256;
+    const overlap = 16;
     const cols = Math.ceil(origW / tileSize);
     const rows = Math.ceil(origH / tileSize);
     const totalTiles = cols * rows;
 
-    let aiModel: tf.LayersModel | null = null;
-    try {
-      aiModel = await loadOrGetAiModel(scale);
-    } catch {
-      aiModel = createFallbackSubPixelModel(scale);
-    }
+    const aiModel = await loadOrGetAiModel(scale);
 
     const modelLoadDuration = performance.now() - modelLoadStart;
 
@@ -359,81 +345,46 @@ export async function upscaleImageWithAi(
         tileCanvas.width = sw * scale;
         tileCanvas.height = sh * scale;
 
-        if (aiModel) {
-          tf.engine().startScope();
-          try {
-            const tileData = srcCtx.getImageData(sx, sy, sw, sh);
-            const inputTensor = tf.browser
-              .fromPixels(tileData)
-              .expandDims(0)
-              .toFloat()
-              .div(255.0);
+        tf.engine().startScope();
+        try {
+          const tileData = srcCtx.getImageData(sx, sy, sw, sh);
+          const inputTensor = tf.browser
+            .fromPixels(tileData)
+            .expandDims(0)
+            .toFloat()
+            .div(255.0);
 
-            const rawOutput = aiModel.predict(inputTensor) as tf.Tensor4D;
+          const rawOutput = aiModel.predict(inputTensor) as tf.Tensor;
 
-            let output3D: tf.Tensor3D;
-            if (rawOutput.shape[3] === 3 * scale * scale) {
-              // Subpixel ESPCN shuffle
-              output3D = tf.depthToSpace(rawOutput, scale).clipByValue(0, 1).squeeze([0]) as tf.Tensor3D;
-            } else {
-              output3D = rawOutput.clipByValue(0, 1).squeeze([0]) as tf.Tensor3D;
-            }
-
-            // Render neural tensor pixels to tile canvas
-            await tf.browser.toPixels(output3D, tileCanvas);
-
-            // Draw seamless center crop region to destination canvas
-            dstCtx.drawImage(
-              tileCanvas,
-              cropLeft,
-              cropTop,
-              targetWRegion * scale,
-              targetHRegion * scale,
-              targetX * scale,
-              targetY * scale,
-              targetWRegion * scale,
-              targetHRegion * scale
-            );
-          } catch (tileErr) {
-            console.warn(`Gagal AI inference tile ${tileCount}, menggunakan fallback canvas:`, tileErr);
-            const tileCtx = tileCanvas.getContext('2d');
-            if (tileCtx) {
-              tileCtx.imageSmoothingEnabled = true;
-              tileCtx.imageSmoothingQuality = 'high';
-              tileCtx.drawImage(srcCanvas, sx, sy, sw, sh, 0, 0, sw * scale, sh * scale);
-              dstCtx.drawImage(
-                tileCanvas,
-                cropLeft,
-                cropTop,
-                targetWRegion * scale,
-                targetHRegion * scale,
-                targetX * scale,
-                targetY * scale,
-                targetWRegion * scale,
-                targetHRegion * scale
-              );
-            }
-          } finally {
-            tf.engine().endScope();
+          let output3D: tf.Tensor3D;
+          if (rawOutput.shape.length === 4 && rawOutput.shape[3] === 3 * scale * scale) {
+            output3D = tf.depthToSpace(rawOutput as tf.Tensor4D, scale).clipByValue(0, 1).squeeze([0]) as tf.Tensor3D;
+          } else if (rawOutput.shape.length === 4) {
+            output3D = (rawOutput as tf.Tensor4D).clipByValue(0, 1).squeeze([0]) as tf.Tensor3D;
+          } else {
+            output3D = (rawOutput as tf.Tensor3D).clipByValue(0, 1) as tf.Tensor3D;
           }
-        } else {
-          const tileCtx = tileCanvas.getContext('2d');
-          if (tileCtx) {
-            tileCtx.imageSmoothingEnabled = true;
-            tileCtx.imageSmoothingQuality = 'high';
-            tileCtx.drawImage(srcCanvas, sx, sy, sw, sh, 0, 0, sw * scale, sh * scale);
-            dstCtx.drawImage(
-              tileCanvas,
-              cropLeft,
-              cropTop,
-              targetWRegion * scale,
-              targetHRegion * scale,
-              targetX * scale,
-              targetY * scale,
-              targetWRegion * scale,
-              targetHRegion * scale
-            );
-          }
+
+          // Render neural tensor pixels to tile canvas
+          await tf.browser.toPixels(output3D, tileCanvas);
+
+          // Draw seamless center crop region to destination canvas
+          dstCtx.drawImage(
+            tileCanvas,
+            cropLeft,
+            cropTop,
+            targetWRegion * scale,
+            targetHRegion * scale,
+            targetX * scale,
+            targetY * scale,
+            targetWRegion * scale,
+            targetHRegion * scale
+          );
+        } catch (tileErr: any) {
+          console.error(`Gagal AI inference tile ${tileCount}:`, tileErr);
+          throw new Error(`Gagal memproses AI tile ${tileCount}: ${tileErr?.message || 'Memori GPU tidak mencukupi'}`);
+        } finally {
+          tf.engine().endScope();
         }
       }
     }
