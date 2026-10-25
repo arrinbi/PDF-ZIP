@@ -56,6 +56,19 @@ describe('App Component', () => {
     expect(screen.getByRole('button', { name: 'WEBP' })).toBeDefined();
   });
 
+  it('allows switching to HD Raw feature view from main navigation cards', async () => {
+    render(<App />);
+
+    const hdRawCard = screen.getByRole('button', { name: /HD Raw/i });
+    fireEvent.click(hdRawCard);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Unggah Gambar Manhwa \/ Komik/i)).toBeDefined();
+      expect(screen.getByRole('button', { name: /Single Image/i })).toBeDefined();
+      expect(screen.getByRole('button', { name: /Batch \/ ZIP Mode/i })).toBeDefined();
+    });
+  });
+
   it('allows switching ZIP format options and disables quality for Original/PNG', async () => {
     render(<App />);
 

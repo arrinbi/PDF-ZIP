@@ -7,6 +7,7 @@ import { PdfPreview } from './components/PdfPreview';
 import { BatchProcessing } from './components/BatchProcessing';
 import { SplitPdf } from './components/SplitPdf';
 import { ProtectPdf } from './components/ProtectPdf';
+import { HdRaw } from './components/HdRaw';
 import type {
   ExportMode,
   ExportResult,
@@ -232,6 +233,14 @@ export const App: React.FC = () => {
       icon: Lock,
       badge: 'Local Security',
     },
+    {
+      id: 'hd-raw' as ExportMode,
+      title: 'HD Raw',
+      label: 'HD Raw',
+      description: 'AI Super Resolution upscaler for comic & manhwa',
+      icon: Sparkles,
+      badge: 'AI Upscaler',
+    },
   ];
 
   return (
@@ -241,7 +250,7 @@ export const App: React.FC = () => {
       <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-8">
         {/* Step 1: Main Feature Navigation Cards */}
         <section aria-label="Main Feature Selector">
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
             {mainFeatures.map((feature) => {
               const Icon = feature.icon;
               const isSelected = exportMode === feature.id;
@@ -303,6 +312,8 @@ export const App: React.FC = () => {
           <SplitPdf />
         ) : exportMode === 'protect' ? (
           <ProtectPdf />
+        ) : exportMode === 'hd-raw' ? (
+          <HdRaw />
         ) : (
           <div className="space-y-6">
             {/* Secondary Navigation: [ Standard Mode ] [ Batch Mode ] */}
