@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import {
   FileText,
   Lock,
+  Unlock,
   Eye,
   EyeOff,
   Download,
@@ -14,7 +15,7 @@ import {
 } from 'lucide-react';
 import type { ProtectPdfResult } from '../types';
 import { getPdfPageCount } from '../utils/pdfSplitter';
-import { protectPdfWithPassword } from '../utils/pdfProtector';
+import { protectPdfWithPassword, unlockPdfWithPassword } from '../utils/pdfProtector';
 
 export interface ProtectPdfItem {
   id: string;
@@ -29,6 +30,7 @@ export interface ProtectPdfItem {
 }
 
 export const ProtectPdf: React.FC = () => {
+  const [actionMode, setActionMode] = useState<'protect' | 'unlock'>('protect');
   const [items, setItems] = useState<ProtectPdfItem[]>([]);
   const [isLoadingFiles, setIsLoadingFiles] = useState<boolean>(false);
   const [showPassword, setShowPassword] = useState<boolean>(false);
@@ -39,6 +41,28 @@ export const ProtectPdf: React.FC = () => {
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const addMoreInputRef = useRef<HTMLInputElement | null>(null);
+
+  const handleActionModeChange = (mode: 'protect' | 'unlock') => {
+    if (mode === actionMode) return;
+    setActionMode(mode);
+    setErrorMessage(null);
+    setItems((prev) =>
+      prev.map((item) => {
+        const cleanName = item.file.name.replace(/\.pdf$/i, '');
+        const isDefaultName =
+          item.outputFilename === `${cleanName}_protected` ||
+          item.outputFilename === `${cleanName}_unlocked`;
+        return {
+          ...item,
+          outputFilename: isDefaultName
+            ? `${cleanName}_${mode === 'protect' ? 'protected' : 'unlocked'}`
+            : item.outputFilename,
+          status: 'idle',
+          errorMessage: undefined,
+        };
+      })
+    );
+  };
 
   const handleFilesSelect = async (files: FileList | File[]) => {
     const fileArray = Array.from(files).filter(
@@ -64,13 +88,14 @@ export const ProtectPdf: React.FC = () => {
           count = 1;
         }
         const cleanName = file.name.replace(/\.pdf$/i, '');
+        const defaultSuffix = actionMode === 'protect' ? 'protected' : 'unlocked';
         newItems.push({
           id,
           file,
           pageCount: count,
           password: '',
           confirmPassword: '',
-          outputFilename: `${cleanName}_protected`,
+          outputFilename: `${cleanName}_${defaultSuffix}`,
           status: 'idle',
         });
       }
@@ -79,7 +104,11 @@ export const ProtectPdf: React.FC = () => {
       setIsProcessed(false);
     } catch (err: any) {
       console.error(err);
-      setErrorMessage('Failed to load PDF file(s). Ensure files are valid and not password-protected.');
+      setErrorMessage(
+        actionMode === 'protect'
+          ? 'Failed to load PDF file(s). Ensure files are valid and not password-protected.'
+          : 'Failed to load PDF file(s). Ensure files are valid.'
+      );
     } finally {
       setIsLoadingFiles(false);
     }
@@ -142,7 +171,7 @@ export const ProtectPdf: React.FC = () => {
     });
   };
 
-  const handleProtectAll = async (e: React.FormEvent) => {
+  const handleProcessAll = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (items.length === 0) {
@@ -150,35 +179,37 @@ export const ProtectPdf: React.FC = () => {
       return;
     }
 
-    // Step 1: Validate each item
+    // Step 1: Validate items based on active action mode
     let hasValidationError = false;
     const updatedItems = items.map((item) => {
       const pwd = item.password.trim();
-      const confirmPwd = item.confirmPassword.trim();
 
-      if (!pwd) {
-        hasValidationError = true;
-        return {
-          ...item,
-          status: 'error' as const,
-          errorMessage: 'Password cannot be empty.',
-        };
-      }
-      if (!confirmPwd) {
-        hasValidationError = true;
-        return {
-          ...item,
-          status: 'error' as const,
-          errorMessage: 'Please confirm the password.',
-        };
-      }
-      if (item.password !== item.confirmPassword) {
-        hasValidationError = true;
-        return {
-          ...item,
-          status: 'error' as const,
-          errorMessage: 'Passwords do not match.',
-        };
+      if (actionMode === 'protect') {
+        const confirmPwd = item.confirmPassword.trim();
+        if (!pwd) {
+          hasValidationError = true;
+          return {
+            ...item,
+            status: 'error' as const,
+            errorMessage: 'Password cannot be empty.',
+          };
+        }
+        if (!confirmPwd) {
+          hasValidationError = true;
+          return {
+            ...item,
+            status: 'error' as const,
+            errorMessage: 'Please confirm the password.',
+          };
+        }
+        if (item.password !== item.confirmPassword) {
+          hasValidationError = true;
+          return {
+            ...item,
+            status: 'error' as const,
+            errorMessage: 'Passwords do not match.',
+          };
+        }
       }
 
       return {
@@ -207,11 +238,20 @@ export const ProtectPdf: React.FC = () => {
       setItems([...finalItems]);
 
       try {
-        const result = await protectPdfWithPassword(
-          item.file,
-          item.password,
-          item.outputFilename || 'protected_document'
-        );
+        let result: ProtectPdfResult;
+        if (actionMode === 'protect') {
+          result = await protectPdfWithPassword(
+            item.file,
+            item.password,
+            item.outputFilename || 'protected_document'
+          );
+        } else {
+          result = await unlockPdfWithPassword(
+            item.file,
+            item.password,
+            item.outputFilename || 'unlocked_document'
+          );
+        }
         finalItems[i] = {
           ...item,
           status: 'success',
@@ -222,7 +262,11 @@ export const ProtectPdf: React.FC = () => {
         finalItems[i] = {
           ...item,
           status: 'error',
-          errorMessage: err.message || 'Failed to apply password protection.',
+          errorMessage:
+            err.message ||
+            (actionMode === 'protect'
+              ? 'Failed to apply password protection.'
+              : 'Failed to unlock PDF.'),
         };
       }
       setItems([...finalItems]);
@@ -252,6 +296,36 @@ export const ProtectPdf: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      {/* Action Mode Toggle Switcher */}
+      <div className="flex justify-center">
+        <div className="inline-flex p-1 bg-slate-200/70 rounded-xl border border-slate-300/60 text-xs sm:text-sm font-semibold shadow-2xs">
+          <button
+            type="button"
+            onClick={() => handleActionModeChange('protect')}
+            className={`px-4 py-2 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
+              actionMode === 'protect'
+                ? 'bg-white text-indigo-700 shadow-xs font-bold'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <Lock className="w-4 h-4" />
+            <span>Protect PDF</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => handleActionModeChange('unlock')}
+            className={`px-4 py-2 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
+              actionMode === 'unlock'
+                ? 'bg-white text-indigo-700 shadow-xs font-bold'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <Unlock className="w-4 h-4" />
+            <span>Unlock PDF</span>
+          </button>
+        </div>
+      </div>
+
       {errorMessage && (
         <div className="bg-red-50 border border-red-200 text-red-700 text-sm p-4 rounded-xl flex items-center justify-between shadow-2xs">
           <div className="flex items-center gap-2">
@@ -295,12 +369,12 @@ export const ProtectPdf: React.FC = () => {
               </div>
               <div>
                 <h2 className="text-lg sm:text-xl font-bold text-slate-900">
-                  PDF Protection Complete!
+                  {actionMode === 'protect' ? 'PDF Protection Complete!' : 'PDF Unlock Complete!'}
                 </h2>
                 <p className="text-xs text-slate-500 mt-0.5">
                   Processed {items.length} file{items.length === 1 ? '' : 's'} (
                   <span className="font-semibold text-emerald-600">
-                    {successfulCount} protected
+                    {successfulCount} {actionMode === 'protect' ? 'protected' : 'unlocked'}
                   </span>
                   {errorCount > 0 ? `, ${errorCount} failed` : ''})
                 </p>
@@ -345,13 +419,18 @@ export const ProtectPdf: React.FC = () => {
                     </p>
                     {item.status === 'success' && item.result ? (
                       <p className="text-xs text-slate-500 flex items-center gap-2 mt-0.5">
-                        <span className="font-semibold text-emerald-600">Encrypted PDF ready</span>
+                        <span className="font-semibold text-emerald-600">
+                          {actionMode === 'protect' ? 'Encrypted PDF ready' : 'Unlocked PDF ready'}
+                        </span>
                         <span>•</span>
                         <span>{formatBytes(item.result.sizeBytes)}</span>
                       </p>
                     ) : (
                       <p className="text-xs text-red-600 font-semibold mt-0.5">
-                        {item.errorMessage || 'Failed to protect PDF.'}
+                        {item.errorMessage ||
+                          (actionMode === 'protect'
+                            ? 'Failed to protect PDF.'
+                            : 'Failed to unlock PDF.')}
                       </p>
                     )}
                   </div>
@@ -386,7 +465,7 @@ export const ProtectPdf: React.FC = () => {
               onClick={handleReset}
               className="px-5 py-2.5 border border-slate-300 hover:bg-slate-50 text-slate-700 font-semibold text-xs sm:text-sm rounded-xl transition-colors cursor-pointer"
             >
-              Protect New PDFs
+              {actionMode === 'protect' ? 'Protect New PDFs' : 'Unlock New PDFs'}
             </button>
           </div>
         </div>
@@ -409,13 +488,19 @@ export const ProtectPdf: React.FC = () => {
           <div className="w-16 h-16 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center mx-auto mb-4 shadow-2xs">
             {isLoadingFiles ? (
               <div className="w-7 h-7 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
-            ) : (
+            ) : actionMode === 'protect' ? (
               <Lock className="w-7 h-7" />
+            ) : (
+              <Unlock className="w-7 h-7" />
             )}
           </div>
 
           <h3 className="text-lg sm:text-xl font-bold text-slate-900 mb-1">
-            {isLoadingFiles ? 'Loading PDF Document(s)...' : 'Upload PDF Files to Protect'}
+            {isLoadingFiles
+              ? 'Loading PDF Document(s)...'
+              : actionMode === 'protect'
+              ? 'Upload PDF Files to Protect'
+              : 'Upload PDF Files to Unlock'}
           </h3>
           <p className="text-xs sm:text-sm text-slate-500 max-w-sm mx-auto mb-4">
             Drag & drop one or multiple PDF documents here, or click to browse from your device.
@@ -423,12 +508,16 @@ export const ProtectPdf: React.FC = () => {
 
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200/80 text-xs font-semibold">
             <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-            <span>100% Local Encryption • Never Sent to External Servers</span>
+            <span>
+              {actionMode === 'protect'
+                ? '100% Local Encryption • Never Sent to External Servers'
+                : '100% Local Decryption • Never Sent to External Servers'}
+            </span>
           </div>
         </div>
       ) : (
         /* View 3: Multi-File Selection & Independent Password Configuration Form */
-        <form onSubmit={handleProtectAll} className="space-y-6 max-w-4xl mx-auto">
+        <form onSubmit={handleProcessAll} className="space-y-6 max-w-4xl mx-auto">
           {/* Header Controls Bar */}
           <div className="bg-white border border-slate-200 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3 shadow-2xs">
             <div>
@@ -436,7 +525,9 @@ export const ProtectPdf: React.FC = () => {
                 Selected PDF Files ({items.length})
               </h3>
               <p className="text-xs text-slate-500">
-                Set an independent password and output name for each PDF file.
+                {actionMode === 'protect'
+                  ? 'Set an independent password and output name for each PDF file.'
+                  : 'Enter the opening password and set output name for each PDF file.'}
               </p>
             </div>
 
@@ -504,17 +595,23 @@ export const ProtectPdf: React.FC = () => {
                 )}
 
                 {/* Per-file Password & Filename Form Fields */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div
+                  className={`grid grid-cols-1 ${
+                    actionMode === 'protect' ? 'sm:grid-cols-3' : 'sm:grid-cols-2'
+                  } gap-4`}
+                >
                   <div>
                     <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                      Password <span className="text-red-500">*</span>
+                      Password {actionMode === 'protect' && <span className="text-red-500">*</span>}
                     </label>
                     <div className="relative">
                       <input
                         type={showPassword ? 'text' : 'password'}
                         value={item.password}
                         onChange={(e) => handleItemPasswordChange(item.id, e.target.value)}
-                        placeholder="Enter password"
+                        placeholder={
+                          actionMode === 'protect' ? 'Enter password' : 'Enter opening password'
+                        }
                         className="w-full px-3.5 py-2 pr-9 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 outline-hidden bg-slate-50/50 focus:bg-white text-slate-900 font-medium"
                       />
                       <button
@@ -523,33 +620,43 @@ export const ProtectPdf: React.FC = () => {
                         className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
                         title={showPassword ? 'Hide passwords' : 'Show passwords'}
                       >
-                        {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                        {showPassword ? (
+                          <EyeOff className="w-3.5 h-3.5" />
+                        ) : (
+                          <Eye className="w-3.5 h-3.5" />
+                        )}
                       </button>
                     </div>
                   </div>
 
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                      Confirm Password <span className="text-red-500">*</span>
-                    </label>
-                    <div className="relative">
-                      <input
-                        type={showPassword ? 'text' : 'password'}
-                        value={item.confirmPassword}
-                        onChange={(e) => handleItemConfirmPasswordChange(item.id, e.target.value)}
-                        placeholder="Confirm password"
-                        className="w-full px-3.5 py-2 pr-9 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 outline-hidden bg-slate-50/50 focus:bg-white text-slate-900 font-medium"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
-                        title={showPassword ? 'Hide passwords' : 'Show passwords'}
-                      >
-                        {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                      </button>
+                  {actionMode === 'protect' && (
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                        Confirm Password <span className="text-red-500">*</span>
+                      </label>
+                      <div className="relative">
+                        <input
+                          type={showPassword ? 'text' : 'password'}
+                          value={item.confirmPassword}
+                          onChange={(e) => handleItemConfirmPasswordChange(item.id, e.target.value)}
+                          placeholder="Confirm password"
+                          className="w-full px-3.5 py-2 pr-9 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 outline-hidden bg-slate-50/50 focus:bg-white text-slate-900 font-medium"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                          title={showPassword ? 'Hide passwords' : 'Show passwords'}
+                        >
+                          {showPassword ? (
+                            <EyeOff className="w-3.5 h-3.5" />
+                          ) : (
+                            <Eye className="w-3.5 h-3.5" />
+                          )}
+                        </button>
+                      </div>
                     </div>
-                  </div>
+                  )}
 
                   <div>
                     <label className="block text-xs font-semibold text-slate-700 mb-1.5">
@@ -559,7 +666,7 @@ export const ProtectPdf: React.FC = () => {
                       type="text"
                       value={item.outputFilename}
                       onChange={(e) => handleItemOutputFilenameChange(item.id, e.target.value)}
-                      placeholder="protected_document"
+                      placeholder={actionMode === 'protect' ? 'protected_document' : 'unlocked_document'}
                       className="w-full px-3.5 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 outline-hidden bg-slate-50/50 focus:bg-white text-slate-900 font-medium"
                     />
                   </div>
@@ -577,13 +684,19 @@ export const ProtectPdf: React.FC = () => {
             >
               {isProcessing ? (
                 <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              ) : (
+              ) : actionMode === 'protect' ? (
                 <Lock className="w-4 h-4" />
+              ) : (
+                <Unlock className="w-4 h-4" />
               )}
               <span>
                 {isProcessing
-                  ? 'Encrypting PDFs...'
-                  : `Protect ${items.length} PDF${items.length === 1 ? '' : 's'}`}
+                  ? actionMode === 'protect'
+                    ? 'Encrypting PDFs...'
+                    : 'Unlocking PDFs...'
+                  : actionMode === 'protect'
+                  ? `Protect ${items.length} PDF${items.length === 1 ? '' : 's'}`
+                  : `Unlock ${items.length} PDF${items.length === 1 ? '' : 's'}`}
               </span>
             </button>
           </div>
