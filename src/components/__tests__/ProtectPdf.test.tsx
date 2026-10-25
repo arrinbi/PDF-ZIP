@@ -12,7 +12,7 @@ describe('ProtectPdf Component', () => {
   beforeEach(() => {
     vi.spyOn(pdfSplitter, 'getPdfPageCount').mockResolvedValue(3);
     vi.spyOn(pdfProtector, 'protectPdfWithPassword').mockImplementation(
-      async (file, password, filename) => {
+      async (_file, _password, filename) => {
         return {
           blob: new Blob(['protected content']),
           url: 'blob:mock-protect-url',
