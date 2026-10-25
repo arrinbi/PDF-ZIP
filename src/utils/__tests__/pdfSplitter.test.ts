@@ -74,8 +74,8 @@ describe('pdfSplitter utility', () => {
 
       const zip = await JSZip.loadAsync(result.zip!.blob);
       const zipFileNames = Object.keys(zip.files);
-      expect(zipFileNames).toContain('my_doc_page_1.png');
-      expect(zipFileNames).toContain('my_doc_page_2.png');
+      expect(zipFileNames).toContain('my_doc_page_1.jpg');
+      expect(zipFileNames).toContain('my_doc_page_2.jpg');
       expect(zipFileNames.some((name) => name.endsWith('.pdf'))).toBe(false);
 
       // Verify created PDF has 2 pages
@@ -91,7 +91,7 @@ describe('pdfSplitter utility', () => {
 
       const zip = await JSZip.loadAsync(result.zip!.blob);
       const zipFileNames = Object.keys(zip.files);
-      expect(zipFileNames).toContain('split_pdf_page_1.png');
+      expect(zipFileNames).toContain('split_pdf_page_1.jpg');
       expect(zipFileNames.some((name) => name.endsWith('.pdf'))).toBe(false);
     });
 
@@ -115,10 +115,10 @@ describe('pdfSplitter utility', () => {
       const zip = await JSZip.loadAsync(result.zip!.blob);
       const zipFileNames = Object.keys(zip.files);
       expect(zipFileNames).toEqual([
-        'multi_split_page_1.png',
-        'multi_split_page_2.png',
-        'multi_split_page_3.png',
-        'multi_split_page_4.png',
+        'multi_split_page_1.jpg',
+        'multi_split_page_2.jpg',
+        'multi_split_page_3.jpg',
+        'multi_split_page_4.jpg',
       ]);
       expect(zipFileNames.some((name) => name.endsWith('.pdf'))).toBe(false);
     });
