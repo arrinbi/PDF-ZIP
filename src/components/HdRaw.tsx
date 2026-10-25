@@ -398,7 +398,9 @@ export const HdRaw: React.FC = () => {
             <h3 className="text-lg sm:text-xl font-bold text-slate-900">
               {mode === 'batch' ? batchProgressText || 'Memproses Batch AI Upscaling...' : 'Meningkatkan Kualitas Gambar dengan AI...'}
             </h3>
-            <p className="text-xs text-slate-500 mt-1">{progressMessage}</p>
+            <p className="text-xs font-medium text-indigo-600 bg-indigo-50/80 px-3 py-1.5 rounded-lg border border-indigo-100 mt-2 inline-block">
+              {progressMessage}
+            </p>
           </div>
 
           <div className="space-y-2">

@@ -68,6 +68,23 @@ let cachedEsrgan2x: tf.LayersModel | null = null;
 let cachedEsrgan4x: tf.LayersModel | null = null;
 
 /**
+ * Ensures TensorFlow.js backend is set to WebGL if available,
+ * falling back gracefully to the default backend if unsupported.
+ */
+export async function ensureTfBackend(): Promise<string> {
+  try {
+    if (tf.getBackend() !== 'webgl') {
+      await tf.setBackend('webgl');
+      await tf.ready();
+    }
+    return tf.getBackend();
+  } catch (err) {
+    console.warn('WebGL backend set failed, using available backend:', tf.getBackend(), err);
+    return tf.getBackend() || 'cpu';
+  }
+}
+
+/**
  * Compiles a Sub-Pixel Convolution Neural Network model for illustration super-resolution.
  */
 function createFallbackSubPixelModel(scale: HdScaleFactor): tf.LayersModel {
@@ -107,7 +124,7 @@ function createFallbackSubPixelModel(scale: HdScaleFactor): tf.LayersModel {
 }
 
 /**
- * Loads or returns pre-trained ESRGAN AI Super Resolution Model with timeout and fallback.
+ * Loads or returns pre-trained ESRGAN AI Super Resolution Model with timeout, warmup, and fallback.
  */
 async function loadOrGetAiModel(scale: HdScaleFactor): Promise<tf.LayersModel> {
   if (scale === 2 && cachedEsrgan2x) return cachedEsrgan2x;
@@ -115,23 +132,36 @@ async function loadOrGetAiModel(scale: HdScaleFactor): Promise<tf.LayersModel> {
 
   const modelUrl = `https://cdn.jsdelivr.net/npm/@upscalerjs/esrgan-slim@1.0.0/models/x${scale}/model.json`;
 
+  let model: tf.LayersModel;
   try {
     const loadPromise = tf.loadLayersModel(modelUrl);
     const timeoutPromise = new Promise<never>((_, reject) =>
       setTimeout(() => reject(new Error('Pemuatan model AI timeout.')), 6000)
     );
 
-    const model = await Promise.race([loadPromise, timeoutPromise]);
-    if (scale === 2) cachedEsrgan2x = model;
-    else cachedEsrgan4x = model;
-    return model;
+    model = await Promise.race([loadPromise, timeoutPromise]);
   } catch (err) {
     console.warn(`Model loading fallback for scale ${scale}:`, err);
-    const fallbackModel = createFallbackSubPixelModel(scale);
-    if (scale === 2) cachedEsrgan2x = fallbackModel;
-    else cachedEsrgan4x = fallbackModel;
-    return fallbackModel;
+    model = createFallbackSubPixelModel(scale);
   }
+
+  // Pre-warm model execution to compile WebGL shaders upfront
+  tf.engine().startScope();
+  try {
+    const dummy = tf.zeros([1, 16, 16, 3]);
+    const warmupResult = model.predict(dummy) as tf.Tensor;
+    if (warmupResult) {
+      await warmupResult.data();
+    }
+  } catch (warmupErr) {
+    console.warn('Model warmup warning:', warmupErr);
+  } finally {
+    tf.engine().endScope();
+  }
+
+  if (scale === 2) cachedEsrgan2x = model;
+  else cachedEsrgan4x = model;
+  return model;
 }
 
 /**
@@ -199,45 +229,8 @@ function canvasToBlob(
 }
 
 /**
- * Applies an illustration line art refinement pass on canvas pixels
- * to crisp black lines and comic illustration edges.
- */
-function applyLineArtRefinement(
-  ctx: CanvasRenderingContext2D,
-  width: number,
-  height: number
-): void {
-  try {
-    const imgData = ctx.getImageData(0, 0, width, height);
-    const data = imgData.data;
-    const len = data.length;
-
-    for (let i = 0; i < len; i += 4) {
-      const r = data[i];
-      const g = data[i + 1];
-      const b = data[i + 2];
-      const luma = 0.299 * r + 0.587 * g + 0.114 * b;
-
-      if (luma < 90) {
-        const factor = 0.92;
-        data[i] = Math.max(0, Math.round(r * factor));
-        data[i + 1] = Math.max(0, Math.round(g * factor));
-        data[i + 2] = Math.max(0, Math.round(b * factor));
-      } else if (luma > 220) {
-        data[i] = Math.min(255, Math.round(r * 1.01));
-        data[i + 1] = Math.min(255, Math.round(g * 1.01));
-        data[i + 2] = Math.min(255, Math.round(b * 1.01));
-      }
-    }
-    ctx.putImageData(imgData, 0, 0);
-  } catch {
-    // Ignore canvas security restrictions
-  }
-}
-
-/**
  * Performs AI Super Resolution on a single image file or Blob using TensorFlow.js.
- * Uses overlapping tile stitching to eliminate tile boundary seam artifacts.
+ * Uses overlapping tile stitching with optimal 512px tile size and canvas reuse.
  */
 export async function upscaleImageWithAi(
   file: File | Blob,
@@ -254,13 +247,18 @@ export async function upscaleImageWithAi(
     throw new Error('Pemrosesan dibatalkan oleh pengguna.');
   }
 
+  const startTime = performance.now();
   const id = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
   const originalPreviewUrl = URL.createObjectURL(file);
 
   let srcCanvas: HTMLCanvasElement | null = null;
   let dstCanvas: HTMLCanvasElement | null = null;
+  let tileCanvas: HTMLCanvasElement | null = null;
 
   try {
+    const activeBackend = await ensureTfBackend();
+    const backendLabel = activeBackend.toLowerCase() === 'webgl' ? 'WebGL (GPU)' : activeBackend.toUpperCase();
+
     const img = await loadImageFromUrl(originalPreviewUrl);
 
     if (cancelSignal?.cancelled) {
@@ -278,8 +276,10 @@ export async function upscaleImageWithAi(
     const targetW = origW * scale;
     const targetH = origH * scale;
 
-    onProgress?.(1, 100, 'Memuat model AI Super Resolution (ESRGAN)...');
+    onProgress?.(1, 100, `[${backendLabel}] Memuat model AI Super Resolution (ESRGAN)...`);
     await yieldToMainThread();
+
+    const modelLoadStart = performance.now();
 
     // Create source canvas
     srcCanvas = document.createElement('canvas');
@@ -303,8 +303,8 @@ export async function upscaleImageWithAi(
     dstCtx.imageSmoothingEnabled = true;
     dstCtx.imageSmoothingQuality = 'high';
 
-    // Tiling parameters with overlap padding to avoid border seams
-    const tileSize = 256;
+    // Tiling parameters: 512px tile size for 4x faster processing while preserving quality
+    const tileSize = 512;
     const overlap = 8; // 8px overlap context around tiles
     const cols = Math.ceil(origW / tileSize);
     const rows = Math.ceil(origH / tileSize);
@@ -317,7 +317,13 @@ export async function upscaleImageWithAi(
       aiModel = createFallbackSubPixelModel(scale);
     }
 
+    const modelLoadDuration = performance.now() - modelLoadStart;
+
     let tileCount = 0;
+    const inferenceStart = performance.now();
+
+    // Instantiate a single tile canvas instance and reuse it across iterations
+    tileCanvas = document.createElement('canvas');
 
     for (let r = 0; r < rows; r++) {
       for (let c = 0; c < cols; c++) {
@@ -330,7 +336,7 @@ export async function upscaleImageWithAi(
         onProgress?.(
           tileCount,
           totalTiles,
-          `Memproses AI tile ${tileCount} dari ${totalTiles} (${pct}%)...`
+          `[${backendLabel}] Memproses AI tile ${tileCount} dari ${totalTiles} (${pct}%)...`
         );
         await yieldToMainThread();
 
@@ -350,7 +356,6 @@ export async function upscaleImageWithAi(
         const cropLeft = (targetX - sx) * scale;
         const cropTop = (targetY - sy) * scale;
 
-        const tileCanvas = document.createElement('canvas');
         tileCanvas.width = sw * scale;
         tileCanvas.height = sh * scale;
 
@@ -430,16 +435,15 @@ export async function upscaleImageWithAi(
             );
           }
         }
-
-        tileCanvas.width = 0;
-        tileCanvas.height = 0;
       }
     }
 
-    applyLineArtRefinement(dstCtx, targetW, targetH);
+    const inferenceDuration = performance.now() - inferenceStart;
 
-    onProgress?.(totalTiles, totalTiles, 'Mengompresi dan membuat hasil HD...');
+    onProgress?.(totalTiles, totalTiles, `[${backendLabel}] Mengompresi dan membuat hasil HD...`);
     await yieldToMainThread();
+
+    const compressStart = performance.now();
 
     let mimeType = 'image/png';
     if (options.outputFormat === 'JPG') {
@@ -462,6 +466,13 @@ export async function upscaleImageWithAi(
 
     const blob = await canvasToBlob(dstCanvas, mimeType, quality);
     const upscaledPreviewUrl = URL.createObjectURL(blob);
+
+    const compressDuration = performance.now() - compressStart;
+    const totalDuration = performance.now() - startTime;
+
+    console.log(
+      `[HD AI Upscale] Total: ${totalDuration.toFixed(0)}ms | Backend: ${backendLabel} | Model Load: ${modelLoadDuration.toFixed(0)}ms | Tile Inference (${totalTiles} tiles): ${inferenceDuration.toFixed(0)}ms (avg ${(inferenceDuration / Math.max(1, totalTiles)).toFixed(1)}ms/tile) | Compression: ${compressDuration.toFixed(0)}ms`
+    );
 
     return {
       id,
@@ -488,6 +499,10 @@ export async function upscaleImageWithAi(
     if (dstCanvas) {
       dstCanvas.width = 0;
       dstCanvas.height = 0;
+    }
+    if (tileCanvas) {
+      tileCanvas.width = 0;
+      tileCanvas.height = 0;
     }
   }
 }
