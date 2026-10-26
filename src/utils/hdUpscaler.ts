@@ -71,6 +71,59 @@ let cachedEsrgan4x: tf.LayersModel | null = null;
  * Ensures TensorFlow.js backend is set to WebGL if available,
  * falling back gracefully to the default backend if unsupported.
  */
+/**
+ * Detects maximum WebGL texture size supported by the hardware/browser.
+ * Defaults to 4096 if WebGL context is not available.
+ */
+export function getWebGLMaxTextureSize(): number {
+  try {
+    if (typeof document === 'undefined') return 4096;
+    const canvas = document.createElement('canvas');
+    const gl =
+      canvas.getContext('webgl2') ||
+      canvas.getContext('webgl') ||
+      canvas.getContext('experimental-webgl');
+    if (gl) {
+      const maxSize = (gl as WebGLRenderingContext).getParameter(
+        (gl as WebGLRenderingContext).MAX_TEXTURE_SIZE
+      );
+      if (typeof maxSize === 'number' && maxSize > 0) {
+        return maxSize;
+      }
+    }
+  } catch (e) {
+    console.warn('Failed to query WebGL MAX_TEXTURE_SIZE:', e);
+  }
+  return 4096;
+}
+
+/**
+ * Calculates a safe tile size (in input image pixels) so that internal
+ * model WebGL tensor textures (e.g., concatenated feature maps up to 640 channels)
+ * remain comfortably below the browser/GPU MAX_TEXTURE_SIZE limit with safety margin.
+ *
+ * Internal tensor texture dimension formula for ESRGAN:
+ * max_dim = ceil(sqrt(channels / 4)) * tile_input_dimension
+ * For 640 channels: ceil(sqrt(160)) * input_dim = 13 * input_dim (or 13 to 20x depending on packed layout).
+ * For 288px input (256px tile + 32px overlap), 19 * 288 = 5472 (exceeding 4096!).
+ * For 160px input (128px tile + 32px overlap), 20 * 160 = 3200 (well below 4096!).
+ */
+export function calculateSafeTileSize(
+  maxTextureSize: number = 4096,
+  overlap: number = 16
+): number {
+  // Conservative internal expansion factor per spatial dimension:
+  // ESRGAN Concatenate layer with 640 channels packs up to ~20 tiles across texture.
+  // We want max_input_dim * 20 <= maxTextureSize - safety_margin (500px).
+  const safetyMargin = 500;
+  const maxSafeInputDim = Math.floor((maxTextureSize - safetyMargin) / 20); // ~179px for 4096
+  const safeTileSize = maxSafeInputDim - overlap * 2; // ~147px -> snap down to 128px
+
+  if (safeTileSize < 64) return 64;
+  if (safeTileSize >= 256 && maxTextureSize >= 8192) return 256;
+  return Math.min(128, Math.max(64, safeTileSize));
+}
+
 export async function ensureTfBackend(): Promise<string> {
   try {
     if (tf.getBackend() !== 'webgl') {
@@ -294,98 +347,137 @@ export async function upscaleImageWithAi(
     dstCtx.imageSmoothingEnabled = true;
     dstCtx.imageSmoothingQuality = 'high';
 
-    // Tiling parameters: 256px tile size with 16px overlap padding for high GPU performance and no grid seams
-    const tileSize = 256;
+    // Tiling parameters: Safe tile size dynamically determined from WebGL MAX_TEXTURE_SIZE
+    const maxTextureSize = activeBackend.toLowerCase() === 'webgl' ? getWebGLMaxTextureSize() : 8192;
     const overlap = 16;
-    const cols = Math.ceil(origW / tileSize);
-    const rows = Math.ceil(origH / tileSize);
-    const totalTiles = cols * rows;
+    let tileSize = calculateSafeTileSize(maxTextureSize, overlap);
+    let cols = Math.ceil(origW / tileSize);
+    let rows = Math.ceil(origH / tileSize);
+    let totalTiles = cols * rows;
 
     const aiModel = await loadOrGetAiModel(scale);
 
     const modelLoadDuration = performance.now() - modelLoadStart;
 
-    let tileCount = 0;
     const inferenceStart = performance.now();
 
     // Instantiate a single tile canvas instance and reuse it across iterations
     tileCanvas = document.createElement('canvas');
 
-    for (let r = 0; r < rows; r++) {
-      for (let c = 0; c < cols; c++) {
-        if (cancelSignal?.cancelled) {
-          throw new Error('Pemrosesan dibatalkan oleh pengguna.');
-        }
+    const runTileInferenceLoop = async (
+      currentTileSize: number,
+      currentBackendLabel: string
+    ): Promise<void> => {
+      const cCols = Math.ceil(origW / currentTileSize);
+      const cRows = Math.ceil(origH / currentTileSize);
+      const cTotal = cCols * cRows;
+      let count = 0;
 
-        tileCount++;
-        const pct = Math.min(95, Math.round((tileCount / totalTiles) * 90) + 5);
-        onProgress?.(
-          tileCount,
-          totalTiles,
-          `[${backendLabel}] Memproses AI tile ${tileCount} dari ${totalTiles} (${pct}%)...`
-        );
-        await yieldToMainThread();
-
-        // Tile source coordinates with overlap padding
-        const sx = Math.max(0, c * tileSize - overlap);
-        const sy = Math.max(0, r * tileSize - overlap);
-        const sw = Math.min(origW - sx, tileSize + (c > 0 ? overlap : 0) + overlap);
-        const sh = Math.min(origH - sy, tileSize + (r > 0 ? overlap : 0) + overlap);
-
-        // Target region without overlap padding
-        const targetX = c * tileSize;
-        const targetY = r * tileSize;
-        const targetWRegion = Math.min(tileSize, origW - targetX);
-        const targetHRegion = Math.min(tileSize, origH - targetY);
-
-        // Offset inside upscaled tile
-        const cropLeft = (targetX - sx) * scale;
-        const cropTop = (targetY - sy) * scale;
-
-        tileCanvas.width = sw * scale;
-        tileCanvas.height = sh * scale;
-
-        tf.engine().startScope();
-        try {
-          const tileData = srcCtx.getImageData(sx, sy, sw, sh);
-          const inputTensor = tf.browser
-            .fromPixels(tileData)
-            .expandDims(0)
-            .toFloat()
-            .div(255.0);
-
-          const rawOutput = aiModel.predict(inputTensor) as tf.Tensor;
-
-          let output3D: tf.Tensor3D;
-          if (rawOutput.shape.length === 4 && rawOutput.shape[3] === 3 * scale * scale) {
-            output3D = tf.depthToSpace(rawOutput as tf.Tensor4D, scale).clipByValue(0, 1).squeeze([0]) as tf.Tensor3D;
-          } else if (rawOutput.shape.length === 4) {
-            output3D = (rawOutput as tf.Tensor4D).clipByValue(0, 1).squeeze([0]) as tf.Tensor3D;
-          } else {
-            output3D = (rawOutput as tf.Tensor3D).clipByValue(0, 1) as tf.Tensor3D;
+      for (let r = 0; r < cRows; r++) {
+        for (let c = 0; c < cCols; c++) {
+          if (cancelSignal?.cancelled) {
+            throw new Error('Pemrosesan dibatalkan oleh pengguna.');
           }
 
-          // Render neural tensor pixels to tile canvas
-          await tf.browser.toPixels(output3D, tileCanvas);
-
-          // Draw seamless center crop region to destination canvas
-          dstCtx.drawImage(
-            tileCanvas,
-            cropLeft,
-            cropTop,
-            targetWRegion * scale,
-            targetHRegion * scale,
-            targetX * scale,
-            targetY * scale,
-            targetWRegion * scale,
-            targetHRegion * scale
+          count++;
+          const pct = Math.min(95, Math.round((count / cTotal) * 90) + 5);
+          onProgress?.(
+            count,
+            cTotal,
+            `[${currentBackendLabel}] Memproses AI tile ${count} dari ${cTotal} (${pct}%)...`
           );
-        } catch (tileErr: any) {
-          console.error(`Gagal AI inference tile ${tileCount}:`, tileErr);
-          throw new Error(`Gagal memproses AI tile ${tileCount}: ${tileErr?.message || 'Memori GPU tidak mencukupi'}`);
-        } finally {
-          tf.engine().endScope();
+          await yieldToMainThread();
+
+          // Tile source coordinates with overlap padding
+          const sx = Math.max(0, c * currentTileSize - overlap);
+          const sy = Math.max(0, r * currentTileSize - overlap);
+          const sw = Math.min(origW - sx, currentTileSize + (c > 0 ? overlap : 0) + overlap);
+          const sh = Math.min(origH - sy, currentTileSize + (r > 0 ? overlap : 0) + overlap);
+
+          // Target region without overlap padding
+          const targetX = c * currentTileSize;
+          const targetY = r * currentTileSize;
+          const targetWRegion = Math.min(currentTileSize, origW - targetX);
+          const targetHRegion = Math.min(currentTileSize, origH - targetY);
+
+          // Offset inside upscaled tile
+          const cropLeft = (targetX - sx) * scale;
+          const cropTop = (targetY - sy) * scale;
+
+          tileCanvas!.width = sw * scale;
+          tileCanvas!.height = sh * scale;
+
+          tf.engine().startScope();
+          try {
+            const tileData = srcCtx.getImageData(sx, sy, sw, sh);
+            const inputTensor = tf.browser
+              .fromPixels(tileData)
+              .expandDims(0)
+              .toFloat()
+              .div(255.0);
+
+            const rawOutput = aiModel.predict(inputTensor) as tf.Tensor;
+
+            let output3D: tf.Tensor3D;
+            if (rawOutput.shape.length === 4 && rawOutput.shape[3] === 3 * scale * scale) {
+              output3D = tf.depthToSpace(rawOutput as tf.Tensor4D, scale).clipByValue(0, 1).squeeze([0]) as tf.Tensor3D;
+            } else if (rawOutput.shape.length === 4) {
+              output3D = (rawOutput as tf.Tensor4D).clipByValue(0, 1).squeeze([0]) as tf.Tensor3D;
+            } else {
+              output3D = (rawOutput as tf.Tensor3D).clipByValue(0, 1) as tf.Tensor3D;
+            }
+
+            // Render neural tensor pixels to tile canvas
+            await tf.browser.toPixels(output3D, tileCanvas!);
+
+            // Draw seamless center crop region to destination canvas
+            dstCtx.drawImage(
+              tileCanvas!,
+              cropLeft,
+              cropTop,
+              targetWRegion * scale,
+              targetHRegion * scale,
+              targetX * scale,
+              targetY * scale,
+              targetWRegion * scale,
+              targetHRegion * scale
+            );
+          } catch (tileErr: any) {
+            console.error(`Gagal AI inference tile ${count}:`, tileErr);
+            throw tileErr;
+          } finally {
+            tf.engine().endScope();
+          }
         }
+      }
+    };
+
+    try {
+      await runTileInferenceLoop(tileSize, backendLabel);
+    } catch (firstErr: any) {
+      // If WebGL texture size error occurs and CPU backend is supported, attempt fallback gracefully
+      const isTextureError =
+        firstErr?.message?.includes('greater than WebGL maximum') ||
+        firstErr?.message?.includes('texture size') ||
+        firstErr?.message?.includes('WebGL');
+
+      if (isTextureError && tf.getBackend() === 'webgl') {
+        console.warn('WebGL texture size exceeded during tile inference. Falling back to CPU backend...');
+        try {
+          await tf.setBackend('cpu');
+          await tf.ready();
+          // Reset destination canvas context
+          dstCtx.clearRect(0, 0, targetW, targetH);
+          await runTileInferenceLoop(tileSize, 'CPU (Fallback)');
+        } catch (cpuErr: any) {
+          throw new Error(
+            `Gagal memproses AI tile: Ukuran tekstur melebihi batas WebGL (${maxTextureSize}px) dan CPU fallback gagal.`
+          );
+        }
+      } else {
+        throw new Error(
+          `Gagal memproses AI tile: ${firstErr?.message || 'Memori GPU tidak mencukupi'}`
+        );
       }
     }
 

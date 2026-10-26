@@ -3,6 +3,8 @@ import {
   isValidHdImageFile,
   getHdOutputFilename,
   upscaleImageWithAi,
+  getWebGLMaxTextureSize,
+  calculateSafeTileSize,
 } from '../hdUpscaler';
 
 if (typeof window !== 'undefined') {
@@ -44,6 +46,34 @@ describe('hdUpscaler utilities', () => {
     it('prevents duplicate stacking of scale suffixes', () => {
       expect(getHdOutputFilename('chapter_01_hd2x.png', 2, 'SAME')).toBe('chapter_01_hd2x.png');
       expect(getHdOutputFilename('chapter_01_hd2x_hd4x.jpg', 4, 'PNG')).toBe('chapter_01_hd4x.png');
+    });
+  });
+
+  describe('WebGL safety and safe tile calculations', () => {
+    it('returns default 4096 max texture size when WebGL context is not available or fallback', () => {
+      const maxSize = getWebGLMaxTextureSize();
+      expect(maxSize).toBeGreaterThan(0);
+      expect(typeof maxSize).toBe('number');
+    });
+
+    it('calculates 128px safe tile size for 4096 max texture size', () => {
+      const tileSize = calculateSafeTileSize(4096, 16);
+      expect(tileSize).toBe(128);
+
+      const inputTileDim = tileSize + 16 * 2; // 160px input
+      // ESRGAN concatenation packs up to 640 channels into WebGL 2D texture layout (up to ~20 tiles)
+      const packedTextureDim = inputTileDim * 20; // 3200px
+      expect(packedTextureDim).toBeLessThan(4096);
+      expect(4096 - packedTextureDim).toBeGreaterThanOrEqual(500); // Safe margin
+    });
+
+    it('calculates 256px safe tile size for 8192 max texture size', () => {
+      const tileSize = calculateSafeTileSize(8192, 16);
+      expect(tileSize).toBe(256);
+
+      const inputTileDim = tileSize + 16 * 2; // 288px input
+      const packedTextureDim = inputTileDim * 20; // 5760px
+      expect(packedTextureDim).toBeLessThan(8192);
     });
   });
 
